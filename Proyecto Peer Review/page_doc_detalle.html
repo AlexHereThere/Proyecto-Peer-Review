@@ -1,0 +1,121 @@
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 id="tituloProyecto">
+            Cargando...
+        </h4>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalNuevaVersion">
+           Subir Nueva Versión +
+        </button>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-header">
+            <ul class="nav nav-tabs card-header-tabs" id="tabsVersiones">
+                </ul>
+        </div>
+
+        <div class="card-body">
+            <div class="btn-group w-100 mb-4">
+                <button class="btn btn-outline-danger" onclick="eliminarVersion()">
+                    Eliminar
+                </button>
+                <button class="btn btn-outline-primary" onclick="abrirVersion()">
+                    Abrir
+                </button>
+            </div>
+
+            <h5 class="card-title">Preview</h5>
+            <div id="previewPDF" class="border rounded mb-4 bg-light d-flex align-items-center justify-content-center" style="min-height: 200px;">
+                <p class="text-muted italic">La vista previa aparecerá aquí</p>
+            </div>
+
+            <h5 class="card-title">Revisiones</h5>
+            <div class="table-responsive">
+                <table class="table table-striped table-hover table-bordered border-primary">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Revisión</th>
+                            <th>Revisor</th>
+                            <th>Estado</th>
+                            <th>Fecha</th>
+                            <th>Acceso</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tablaRevisiones">
+                        </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- modal eliminacionVersion -->
+<div class="modal fade" id="modalConfirmarEliminar" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title">Confirmar Eliminación</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p id="textoConfirmacionEliminar">¿Estás seguro de que deseas eliminar esta versión? Esta acción no se puede deshacer.</p>
+        <div id="statusEliminar" class="d-none">
+          <div class="d-flex align-items-center text-danger">
+            <div class="spinner-border spinner-border-sm me-2"></div>
+            <span>Eliminando</span>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="btnCerrarModalEliminar">Cancelar</button>
+        <button type="button" id="btnConfirmarEliminarDoc" class="btn btn-danger">Eliminar Definitivamente</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- modal subirVersion -->
+<div class="modal fade" id="modalNuevaVersion" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-success text-white">
+        <h5 class="modal-title">Subir Nueva Versión</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <p class="text-muted">Se añadirá una nueva versión al documento actual.</p>
+          <label class="form-label">Selecciona el archivo PDF actualizado</label>
+          <input type="file" id="fileInputNuevaVersion" class="form-control" accept="application/pdf">
+        </div>
+        <div id="statusSubidaVersion" class="d-none">
+          <div class="d-flex align-items-center text-success">
+            <div class="spinner-border spinner-border-sm me-2"></div>
+            <span>Subiendo archivo al servidor...</span>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="btnCerrarModalVersion">Cancelar</button>
+        <button type="button" id="btnConfirmarSubidaVersion" class="btn btn-success" onclick="procesarNuevaVersion()">Subir Versión</button>
+      </div>
+    </div>
+  </div>
+</div>
+/////////////////////////////////////////////////// PRUEBA Asignacion de Revisor /////////////////////////////////////
+<div class="card mt-4 border-primary">
+  <div class="card-header bg-primary text-white">
+    <h6 class="mb-0">Asignar Revisión Formal</h6>
+  </div>
+  <div class="card-body">
+    <p class="small text-muted">Esto creará una copia del documento y notificará al revisor.</p>
+    <div class="input-group">
+      <span class="input-group-text"><i class="bi bi-person-plus"></i></span>
+      <input type="email" id="emailRevisor" class="form-control" placeholder="correo@empresa.com">
+      <button class="btn btn-primary" onclick="ejecutarAsignacion()">
+        Asignar Revisor
+      </button>
+    </div>
+    <div id="msgAsignacion" class="mt-2"></div>
+  </div>
+</div>

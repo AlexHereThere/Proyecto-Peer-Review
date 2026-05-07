@@ -1,0 +1,129 @@
+<div class="dropdown theme-switcher mt-3">
+            <button class="btn btn-light dropdown-toggle btn-sm" id="themebtn" type="button" data-bs-toggle="dropdown">
+            Tema <svg id="Contrast--Streamline-Carbon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" height="16" width="16">
+             <path d="M14.685 5.92a6.8 6.8 0 0 0 -0.53 -1.255A7.085 7.085 0 0 0 12.95 3.05a7 7 0 1 0 0 9.9 7.085 7.085 0 0 0 1.205 -1.615 6.8 6.8 0 0 0 0.53 -1.255 7 7 0 0 0 0 -4.16ZM2 8A6 6 0 0 1 8 2v12A6 6 0 0 1 2 8Z" fill="#000000" stroke-width="0.5"></path>
+             <path id="_Transparent_Rectangle_" d="M0 0h16v16H0Z" fill="none" stroke-width="0.5"></path>
+            </svg>
+            </button>
+            <ul class="dropdown-menu">
+              <li><button class="dropdown-item" data-bs-theme-value="light">Claro</button></li>
+              <li><button class="dropdown-item" data-bs-theme-value="dark">Oscuro</button></li>
+              <li><button class="dropdown-item" data-bs-theme-value="auto">Auto</button></li>
+            </ul>
+</div>
+
+<div class="text-center mt-4">
+  <img id="userPhoto" class="profile">
+  <h6 id="userName" class="text-white mt-2"></h6>
+</div>
+
+<nav class="d-flex flex-column mt-4">
+  <button 
+    class="btn btn-light m-2" 
+    onclick="cargarVista('page_home')">
+    Inicio
+  </button>
+
+  <button 
+    class="btn btn-light m-2" 
+    onclick="cargarVista('page_cuenta')">
+    Mi cuenta
+  </button>
+
+  <button 
+    class="btn btn-light m-2" 
+    onclick="cargarVista('page_documentos')">
+    Mis Documentos
+  </button>
+
+  <button 
+    class="btn btn-light m-2" 
+    onclick="cargarVista('page_revisiones')">
+    Revisiones Asignadas
+  </button>
+
+  <button 
+    class="btn btn-light m-2" 
+    onclick="cargarVista('page_nosotros')">
+    Sobre Nosotros
+  </button>
+
+  <button 
+    class="btn btn-light m-2" 
+    onclick="cargarVista('page_manual')">
+    Manual
+  </button>
+  
+</nav>
+
+<script>
+/* ===== Script de temas ===== */
+(() => {
+
+  // Obtener tema guardado 
+  const getStoredTheme = () => {
+    return localStorage.getItem('theme');
+  };
+
+  // Guardar tema 
+  const setStoredTheme = (theme) => {
+    localStorage.setItem('theme', theme);
+  };
+
+  // Tema preferido 
+  const getPreferredTheme = () => {
+
+    const storedTheme = getStoredTheme();
+
+    // Usar guardado si existe
+    if (storedTheme) {
+      return storedTheme;
+    }
+
+    // Si no, usar sistema
+    return window
+      .matchMedia('(prefers-color-scheme: dark)')
+      .matches
+        ? 'dark'
+        : 'light';
+
+  };
+
+  /* Aplicar tema */
+  const setTheme = (theme) => {
+
+    if (theme === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches) 
+    {
+      document.documentElement.setAttribute('data-bs-theme', 'dark');
+    } 
+    else 
+    {
+      document.documentElement.setAttribute('data-bs-theme', theme);
+    }
+
+  };
+
+  /* Tema inicial */
+  setTheme(
+    getPreferredTheme()
+  );
+
+  /* Botones de tema */
+  window.addEventListener('DOMContentLoaded', () => {
+
+    const buttons =
+      document.querySelectorAll('[data-bs-theme-value]');
+
+    buttons.forEach(button => {
+      button.addEventListener('click', () => {
+
+        const theme = button.getAttribute('data-bs-theme-value');
+        setStoredTheme(theme);
+        setTheme(theme);
+
+      });
+    });
+  });
+})();
+</script>
+

@@ -1,0 +1,66 @@
+<div class="container mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h4>Mis Documentos</h4>
+    <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalSubir">
+      <i class="bi bi-plus-lg"></i> + Nuevo Documento
+    </button>
+  </div>
+
+  <div class="card mb-4">
+    <div class="card-body">
+      <div class="d-flex gap-2">
+        <input type="search" id="buscador" class="form-control" placeholder="Buscar Documentos..." oninput="filtrarDocumentos()">
+        <div class="dropdown">
+          <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+            Buscar Por: <span id="criterioActual"></span>
+          </button>
+          <ul class="dropdown-menu">
+            <li><a class="dropdown-item" onclick="setBuscarPor('Nombre')">Nombre</a></li>
+            <li><a class="dropdown-item" onclick="setBuscarPor('Estado')">Estado</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="table-responsive shadow-sm rounded">
+    <table class="table table-hover table-sm table-bordered mb-0">
+      <thead class="table-dark">
+        <tr>
+          <th>Nombre</th>
+          <th>Estado</th>
+          <th>Fecha</th>
+        </tr>
+      </thead>
+      <tbody id="tablaDocumentos">
+        </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="modal fade" id="modalSubir" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title">Subir Trabajo</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label" id="mensajeSubida">Selecciona tu archivo PDF</label>
+          <input type="file" id="fileInput" class="form-control" accept="application/pdf">
+        </div>
+        <div id="statusArea" class="d-none">
+          <div class="d-flex align-items-center text-primary">
+            <div class="spinner-border spinner-border-sm me-2"></div>
+            <span id="statusText">Procesando...</span>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" id="btnSubir" class="btn btn-primary" onclick="ejecutarSubida()">Subir Documento</button>
+      </div>
+    </div>
+  </div>
+</div>

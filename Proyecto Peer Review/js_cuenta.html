@@ -1,0 +1,108 @@
+<script>
+/**
+ * js_cuenta.html - Gestión Visual del Tablero de Usuario
+ */
+
+/**
+ * Inicia la petición al servidor para obtener los datos consolidados del dashboard.
+ * Gestiona el éxito de la carga o muestra un mensaje de error en la lista de actividad.
+ */
+function cargarDashboard() {
+  google.script.run
+    .withSuccessHandler(actualizarInterfaz)
+    .withFailureHandler(function(err) {
+       console.error("Error al cargar datos del dashboard:", err);
+       const listaUI = document.getElementById('lista-actividad');
+       if (listaUI) {
+         listaUI.innerHTML = 
+           '<li class="list-group-item text-danger">Error al sincronizar datos del servidor.</li>';
+       }
+    })
+    .getDashboardData();
+}
+
+/**
+ * Renderiza la información en los elementos del DOM.
+ * @param {object} data - Objeto de datos proveniente de getDashboardData en el servidor.
+ * @param {object} data.perfil - Datos del usuario (nombre, email, rol).
+ * @param {object} data.stats - Contadores de estados (revisados, pendientes, etc.).
+ * @param {Array} data.recientes - Lista de objetos de actividad reciente.
+ */
+function actualizarInterfaz(data) {
+  // Llenar Información de Perfil
+  const elNombre = document.getElementById('u-nombre');
+  const elEmail = document.getElementById('u-email');
+  const containerRoles = document.getElementById('u-roles-container');
+
+  if (elNombre) elNombre.innerText = data.perfil.nombre;
+  if (elEmail) elEmail.innerText = data.perfil.email;
+
+  // Manejo de Roles con tus colores personalizados
+  if (containerRoles && data.perfil.rol) {
+    containerRoles.innerHTML = ""; 
+
+    // Mapeo: Rol -> Categoría de Bootstrap (que ya tiene tus colores)
+    const mapaColores = {
+      'Autor': 'bg-primary',   // Usará tu verde (#00723f)
+      'Revisor': 'bg-secondary', // Usará tu naranja/oro (#dd971a)
+      'Admin': 'bg-success',   // Usará tu azul (#20419A)
+      'Editor': 'bg-info'      // Usará tu púrpura (#630df0)
+    };
+
+    const roles = data.perfil.rol.split(',').map(rol => rol.trim());
+
+    roles.forEach(rol => {
+      if (rol) {
+        // Buscamos el color en el mapa, si no existe usamos secondary por defecto
+        const claseColor = mapaColores[rol] || 'bg-secondary';
+
+        const cardHTML = `
+          <div class="card ${claseColor} text-white shadow-sm border-0">
+            <div class="card-body py-1 px-3">
+              <small class="fw-bold" style="font-size: 0.75rem; letter-spacing: 0.5px;">
+                ${rol}
+              </small>
+            </div>
+          </div>`;
+        containerRoles.insertAdjacentHTML('beforeend', cardHTML);
+      }
+    });
+  }
+
+  // Llenar Contadores (Estadísticas)
+  // Nota: Estos también se verán afectados por tus nuevos colores si usas las clases de Bootstrap
+  if(document.getElementById('stat-revisados')) {
+      document.getElementById('stat-revisados').innerText = data.stats.revisados;
+      document.getElementById('stat-pendientes').innerText = data.stats.pendientes;
+      document.getElementById('stat-terminados').innerText = data.stats.terminados;
+      document.getElementById('stat-corregir').innerText = data.stats.corregir;
+  }
+
+  // Renderizar Lista de Actividad Reciente
+  const listaUI = document.getElementById('lista-actividad');
+  if (!listaUI) return;
+  
+  listaUI.innerHTML = ""; 
+
+  if (!data.recientes || data.recientes.length === 0) {
+    listaUI.innerHTML = '<li class="list-group-item text-muted text-center">No hay actividad registrada recientemente.</li>';
+    return;
+  }
+
+  data.recientes.forEach(act => {
+    const itemHTML = `
+      <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+        <div>
+            ${act.accion 
+                ? `<button type="button" class="btn btn-link p-0 text-decoration-none fw-bold ${act.colorClass}" 
+                    onclick="${act.accion}">${act.titulo}</button>` 
+                : `<span class="fw-bold ${act.colorClass}">${act.titulo}</span>`
+            }
+            <span class="ms-2 small text-muted">${act.descripcion}</span>
+        </div>
+        <span class="small text-muted">${act.fecha}</span>
+      </li>`;
+    listaUI.insertAdjacentHTML('beforeend', itemHTML);
+  });
+}
+</script>

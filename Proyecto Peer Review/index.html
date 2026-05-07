@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta charset="utf-8">
+    <base target="_top">
+    <?!= include('css'); ?>
+    <?!= include('css_cuenta'); ?>
+  </head>
+
+  <body>
+    <div class="container-fluid">
+      <div class="row min-vh-100">
+        
+        <div class="col-12 col-sm-4 col-lg-3 bg-primary">
+          <?!= include('component_sidebar'); ?>
+        </div>
+
+        <div class="col-12 col-sm-8 col-lg-9">
+          <div id="contenido">
+          </div>
+          <?!= include('component_footer'); ?>
+        </div>
+
+      </div>
+    </div>
+
+    <?!= include('js'); ?>
+    <?!= include('js_home'); ?>
+    <?!= include('js_cuenta'); ?>
+    <?!= include('js_documentos'); ?>
+    <?!= include('js_doc_detalle'); ?>
+    <?!= include('js_autor_visor'); ?>
+    <?!= include('js_revisiones'); ?>
+    <?!= include('js_revisor_visor'); ?>
+  </body>
+</html>

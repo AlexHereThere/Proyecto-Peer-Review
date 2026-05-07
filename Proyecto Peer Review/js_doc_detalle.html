@@ -1,0 +1,350 @@
+<script>
+/**
+ * js_doc_detalle.html - Gestión de Versiones y Revisiones
+ */
+
+/** @type {Array<Object>} Lista de versiones obtenidas del servidor */
+let versiones = [];
+/** @type {Object|null} Referencia a la versión seleccionada actualmente */
+let versionActual = null;
+/** @type {string|null} ID del documento maestro */
+let idDocumentoRaiz = null;
+/** @type {string|null} ID de la carpeta de Drive para versiones */
+let versionesFolderId = null;
+/** @type {string|null} ID de la carpeta de Drive para revisiones */
+let revisionesFolderId = null;
+
+// --- 1. INICIALIZACIÓN ---
+
+/**
+ * Orquestador inicial que recupera el ID del documento activo y prepara la interfaz.
+ * @function cargarDetalle
+ */
+function cargarDetalle() {
+  const idDocOriginal = window.ID_DOCUMENTO_ACTUAL;
+  if (!idDocOriginal) {
+    console.error("No hay ID_DOCUMENTO_ACTUAL");
+    return cargarVista("page_documentos");
+  }
+  idDocumentoRaiz = idDocOriginal;
+  if (typeof esperarElemento === "function") {
+    esperarElemento("previewPDF").then(() => cargarDetalleDocumento());
+  } else {
+    cargarDetalleDocumento();
+  }
+}
+
+/**
+ * Realiza la llamada al servidor para obtener el objeto jerárquico del documento.
+ * @function cargarDetalleDocumento
+ */
+function cargarDetalleDocumento() {
+  google.script.run
+    .withSuccessHandler(renderDetalle)
+    .withFailureHandler(err => {
+      console.error("Error en servidor:", err);
+      alert("Error al cargar el documento: " + err.message);
+    })
+    .obtenerDetalleDocumento(idDocumentoRaiz);
+}
+
+// --- 2. RENDERIZADO DE INTERFAZ (UI) ---
+
+/**
+ * Procesa los datos del servidor y distribuye la información en los componentes.
+ * @function renderDetalle
+ * @param {Object} data - Objeto con nombre, carpetas e historial de versiones.
+ */
+function renderDetalle(data) {
+  if (!data) {
+    alert("El documento solicitado no existe o no tienes permisos.");
+    return cargarVista("page_documentos");
+  }
+  const titulo = document.getElementById("tituloProyecto");
+  if (titulo) titulo.innerText = data.nombre || "Sin título";
+  versiones = data.versiones || [];
+  if (data.carpetas) {
+    versionesFolderId = data.carpetas.versiones || null;
+    revisionesFolderId = data.carpetas.revisiones || null;
+  } else {
+    console.warn("No se recibieron IDs de carpetas del servidor.");
+  }
+  renderTabsVersiones();
+}
+
+/**
+ * Genera dinámicamente las pestañas para navegar entre las versiones del documento.
+ * @function renderTabsVersiones
+ */
+function renderTabsVersiones() {
+  const cont = document.getElementById("tabsVersiones");
+  if (!cont) return;
+  if (versiones.length === 0) {
+    cont.innerHTML = '<li class="nav-item"><span class="nav-link disabled">Sin versiones</span></li>';
+    return;
+  }
+  cont.innerHTML = versiones.map((ver, i) => `
+    <li class="nav-item">
+      <a class="nav-link ${i === 0 ? 'active' : ''}" href="#" onclick="seleccionarVersion(${i}); return false;">
+        V${ver.numero}
+      </a>
+    </li>
+  `).join("");
+  seleccionarVersion(0);
+}
+
+/**
+ * Renderiza la tabla de revisiones asociada a la versión seleccionada.
+ * @function renderRevisionesVersion
+ * @param {Array<Object>} revs - Lista de revisiones.
+ */
+function renderRevisionesVersion(revs) {
+  const tbody = document.getElementById("tablaRevisiones");
+  if (!tbody) return;
+  if (!revs || revs.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">Sin revisiones en esta versión.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = revs.map(r => `
+    <tr>
+      <td class="fw-bold">R${r.numero}</td>
+      <td>${r.revisor || 'Pendiente'}</td>
+      <td>
+        <span class="badge ${r.estado === 'Finalizado' ? 'bg-success' : 'bg-warning text-dark'}">
+          ${r.estado || 'Enviado'}
+        </span>
+      </td>
+      <td>${r.fecha || '-'}</td>
+      <td class="text-center">
+        <button class="btn btn-sm btn-outline-primary" onclick="abrirObservacionesAutor('${r.fileId}', 'Revision R${r.numero}')">
+          <i class="bi bi-eye"></i> Ver observaciones
+        </button> 
+      </td>
+    </tr>
+  `).join("");
+}
+
+// --- 3. ACCIONES DE USUARIO ---
+
+/**
+ * Actualiza la versión activa en pantalla y refresca la previsualización y revisiones.
+ * @function seleccionarVersion
+ * @param {number} index - Índice del arreglo 'versiones'.
+ */
+function seleccionarVersion(index) {
+  if (!versiones[index]) return;
+  versionActual = versiones[index];
+  cargarPreview(versionActual.fileId);
+  renderRevisionesVersion(versionActual.revisiones);
+  const links = document.querySelectorAll("#tabsVersiones .nav-link");
+  links.forEach((link, i) => {
+    link.classList.toggle("active", i === index);
+  });
+}
+
+/**
+ * Carga una miniatura del PDF desde Drive o muestra acceso directo si falla.
+ * @function cargarPreview
+ * @param {string} fileId - ID del archivo en Google Drive.
+ */
+function cargarPreview(fileId) {
+  const preview = document.getElementById("previewPDF");
+  if (!preview) return;
+  if (!fileId) {
+    preview.innerHTML = '<div class="alert alert-warning">Archivo no encontrado en Drive.</div>';
+    return;
+  }
+  preview.innerHTML = `
+    <div class="d-flex justify-content-center align-items-center" style="height: 300px;">
+      <div class="spinner-border text-primary" role="status"></div>
+    </div>`;
+  const url = 'https://drive.google.com/thumbnail?id=' + fileId + '&sz=w1000';
+  const img = new Image();
+  img.onload = () => {
+    preview.innerHTML = `<img src="${url}" class="img-fluid rounded shadow-sm border" style="max-height: 550px; width: 100%; object-fit: contain;">`;
+  };
+  img.onerror = () => {
+    preview.innerHTML = `<div class="alert alert-light text-center border py-5">
+      <i class="bi bi-file-pdf display-4 text-muted"></i><br>
+      Previsualización no disponible aún.<br>
+      <a href="https://drive.google.com/file/d/${fileId}/view" target="_blank" class="btn btn-primary mt-2">Abrir directamente</a>
+    </div>`;
+  };
+  img.src = url;
+}
+
+/**
+ * Abre el archivo seleccionado en una nueva pestaña de Google Drive.
+ * @function abrirVersion
+ */
+function abrirVersion() {
+  if (!versionActual || !versionActual.fileId) {
+    alert("Por favor, selecciona una versión válida.");
+    return;
+  }
+  window.open("https://drive.google.com/file/d/" + versionActual.fileId + "/view", '_blank');
+}
+
+/**
+ * Muestra el modal de confirmación antes de proceder con la eliminación.
+ * @function eliminarVersion
+ */
+function eliminarVersion() {
+  if (!versionActual) {
+    alert("No hay una versión seleccionada para eliminar.");
+    return;
+  }
+  const modalElem = document.getElementById('modalConfirmarEliminar');
+  const instanciaModal = new bootstrap.Modal(modalElem);
+  instanciaModal.show();
+  const btnConfirmar = document.getElementById('btnConfirmarEliminarDoc');
+  btnConfirmar.onclick = () => ejecutarEliminacionVersion(instanciaModal);
+}
+
+// --- 4. ELIMINACIÓN Y SUBIDA ---
+
+/**
+ * Ejecuta la llamada al servidor para eliminar la versión física y lógica.
+ * @function ejecutarEliminacionVersion
+ * @param {bootstrap.Modal} instanciaModal - Instancia del modal para cerrarlo.
+ */
+function ejecutarEliminacionVersion(instanciaModal) {
+  const statusArea = document.getElementById("statusEliminar");
+  const btnConfirmar = document.getElementById("btnConfirmarEliminarDoc");
+  if (!versionesFolderId) return alert("Error: ID de carpeta no encontrado.");
+  toggleUIState([btnConfirmar], statusArea, true);
+  google.script.run
+    .withSuccessHandler(res => {
+      instanciaModal.hide();
+      toggleUIState([btnConfirmar], statusArea, false);
+      res.eliminadoCompleto ? cargarVista("page_documentos") : cargarDetalleDocumento();
+    })
+    .withFailureHandler(err => {
+      toggleUIState([btnConfirmar], statusArea, false);
+      alert("Error: " + err.message);
+    })
+    .eliminarVersionServidor(versionesFolderId, versionActual.numero);
+}
+
+/**
+ * Lee el archivo seleccionado y lo envía al servidor como Base64.
+ * @async
+ * @function procesarNuevaVersion
+ */
+async function procesarNuevaVersion() {
+  const fileInput = document.getElementById('fileInputNuevaVersion');
+  const btnSubir = document.getElementById('btnConfirmarSubidaVersion');
+  const statusArea = document.getElementById('statusSubidaVersion');
+  if (!fileInput.files.length) return alert("Selecciona un archivo PDF.");
+  if (!versionesFolderId) return alert("Error técnico: Carpeta de versiones no identificada.");
+  const archivo = fileInput.files[0];
+  toggleUIState([btnSubir], statusArea, true);
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const base64 = e.target.result.split(",")[1];
+    google.script.run
+      .withSuccessHandler(() => {
+        fileInput.value = "";
+        toggleUIState([btnSubir], statusArea, false);
+        bootstrap.Modal.getInstance(document.getElementById('modalNuevaVersion'))?.hide();
+        setTimeout(() => cargarDetalleDocumento(), 1000);
+      })
+      .withFailureHandler(err => {
+        toggleUIState([btnSubir], statusArea, false);
+        alert(`Error: ${err.message}`);
+      })
+      .subirNuevaVersionServidor(versionesFolderId, base64);
+  };
+  reader.readAsDataURL(archivo);
+}
+
+/**
+ * Alterna estados de carga en botones y spinners.
+ * @function toggleUIState
+ * @param {Array<HTMLElement>} buttons - Lista de botones a bloquear/desbloquear.
+ * @param {HTMLElement} statusElement - Elemento de feedback visual.
+ * @param {boolean} isLoading - Estado de carga.
+ */
+function toggleUIState(buttons, statusElement, isLoading) {
+  buttons.forEach(btn => { if(btn) btn.disabled = isLoading; });
+  if (statusElement) {
+    isLoading ? statusElement.classList.remove("d-none") : statusElement.classList.add("d-none");
+  }
+}
+
+/**
+ * Ejecuta la asignación de un revisor utilizando los datos de la versión activa.
+ * @function ejecutarAsignacion
+ */
+function ejecutarAsignacion() {
+  const emailInput = document.getElementById("emailRevisor");
+  const email = emailInput ? emailInput.value.trim() : "";
+  const idArchivoV = versionActual ? versionActual.fileId : null;
+  const folderRevId = revisionesFolderId;
+  if (!idArchivoV) return alert("Error: No se ha detectado una versión seleccionada.");
+  if (!folderRevId) return alert("Error técnico: No se encontró la carpeta de revisiones.");
+  if (!validarEmail(email)) {
+    mostrarMensajeRev("Por favor, ingresa un correo válido.", "text-danger");
+    return;
+  }
+  const btn = event.currentTarget;
+  const originalHTML = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Asignando...';
+  google.script.run
+    .withSuccessHandler((res) => {
+      btn.disabled = false;
+      btn.innerHTML = originalHTML;
+      if (res.success) {
+        emailInput.value = "";
+        mostrarMensajeRev("¡Revisión R" + res.num + " asignada con éxito!", "text-success");
+        setTimeout(() => cargarDetalleDocumento(), 1500);
+      }
+    })
+    .withFailureHandler((err) => {
+      btn.disabled = false;
+      btn.innerHTML = originalHTML;
+      mostrarMensajeRev("Error al asignar: " + err.message, "text-danger");
+    })
+    .asignarRevision(idArchivoV, email, folderRevId);
+}
+
+/**
+ * Muestra feedback visual al usuario tras una asignación.
+ * @function mostrarMensajeRev
+ * @param {string} texto - Mensaje a mostrar.
+ * @param {string} clase - Clase CSS para el estilo.
+ */
+function mostrarMensajeRev(texto, clase) {
+  const el = document.getElementById("msgAsignacion");
+  if (!el) return;
+  el.className = "mt-2 small fw-bold " + clase;
+  el.textContent = texto;
+  if (clase.includes("success")) {
+    setTimeout(() => { el.textContent = ""; }, 5000);
+  }
+}
+
+/**
+ * Validador básico de formato de email.
+ * @function validarEmail
+ * @param {string} email - Correo a validar.
+ * @returns {boolean}
+ */
+function validarEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+/**
+ * Prepara los datos globales y navega a la vista del visor del autor.
+ * @function abrirObservacionesAutor
+ * @param {string} fileId - ID del archivo de revisión.
+ * @param {string} nombre - Nombre descriptivo para la revisión.
+ */
+function abrirObservacionesAutor(fileId, nombre) {
+  if (!fileId) return alert("Archivo no disponible.");
+  window.ID_REVISION_ACTUAL = fileId;
+  window.NOMBRE_REVISION_ACTUAL = nombre;
+  cargarVista("page_autor_visor");
+}
+</script>

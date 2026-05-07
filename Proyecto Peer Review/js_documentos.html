@@ -1,0 +1,222 @@
+<script>
+/**
+ * js_documentos.html - Lógica para la gestión y visualización de la lista de documentos.
+ */
+
+// --- 1. VARIABLES GLOBALES ---
+
+/** @type {Array<Object>} Almacén de objetos de documentos {fecha, nombre, idRaiz, estado} */
+let todosLosDocs = [];
+
+/** @type {string} Criterio de búsqueda seleccionado por el usuario */
+let buscarPor = "Nombre";
+
+/** @const {Object} Mapeo de estados de documentos a clases CSS de Bootstrap */
+const BADGE_ESTADO = {
+  "Pendiente": "bg-secondary",
+  "En revisión": "bg-warning text-dark",
+  "A Corregir": "bg-danger",
+  "Revisado": "bg-primary",
+  "Aprobado": "bg-success"
+};
+
+// --- 2. CARGA Y SINCRONIZACIÓN ---
+
+/**
+ * Inicializa la vista de documentos configurando los criterios de búsqueda por defecto.
+ */
+function cargarDocumentos() {
+  const criterioEl = document.getElementById("criterioActual");
+  if (criterioEl) criterioEl.textContent = "Nombre";
+  cargarTablaDocumentos();
+}
+
+/**
+ * Solicita al servidor la lista de documentos vinculados al usuario actual.
+ */
+function cargarTablaDocumentos() {
+  const tbody = document.getElementById("tablaDocumentos");
+  if (!tbody) return;
+
+  mostrarLoadingTabla(tbody, true);
+
+  google.script.run
+    .withSuccessHandler((data) => {
+      tbody.dataset.cargando = "false";
+      todosLosDocs = data || [];
+      renderTablaDocumentos(todosLosDocs);
+    })
+    .withFailureHandler((err) => {
+      tbody.dataset.cargando = "false";
+      tbody.innerHTML = `<tr><td colspan="3" class="text-center text-danger py-3">Error: ${err.message}</td></tr>`;
+    })
+    .obtenerDocumentos_Usuario();
+}
+
+// --- 3. FILTRADO Y RENDERIZADO ---
+
+/**
+ * Actualiza el criterio de búsqueda (Nombre o Estado).
+ * @param {string} valor - El nombre del campo por el cual filtrar.
+ */
+function setBuscarPor(valor) {
+  buscarPor = valor;
+  const criterioEl = document.getElementById("criterioActual");
+  if (criterioEl) criterioEl.textContent = valor;
+  filtrarDocumentos();
+}
+
+/**
+ * Filtra la lista global de documentos según el texto ingresado en el buscador.
+ */
+function filtrarDocumentos() {
+  const buscador = document.getElementById("buscador");
+  if (!buscador) return;
+
+  const query = buscador.value.toLowerCase();
+  const filtrados = todosLosDocs.filter(doc => {
+    const campo = (buscarPor === "Nombre") ? doc.nombre : doc.estado;
+    return campo ? campo.toString().toLowerCase().includes(query) : false;
+  });
+  renderTablaDocumentos(filtrados);
+}
+
+/**
+ * Renderiza las filas de la tabla basándose en los datos procesados.
+ * @param {Array<Object>} docs - Lista de documentos filtrada o completa.
+ */
+function renderTablaDocumentos(docs) {
+  const tbody = document.getElementById("tablaDocumentos");
+  if (!tbody) return;
+
+  if (!docs || docs.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="3" class="text-center text-muted py-3">No se encontraron documentos registrados.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = docs.map(doc => {
+    const { fecha, nombre, idRaiz, estado } = doc;
+    const badgeClass = BADGE_ESTADO[estado] || "bg-secondary";
+
+    return `
+      <tr>
+        <td class="align-middle">
+          <a class="fw-semibold link-primary text-decoration-none" href="#" 
+             onclick="abrirDocumento('${idRaiz}'); return false;">
+            <i class="bi bi-file-earmark-pdf me-2"></i>${nombre}
+          </a>
+        </td>
+        <td class="align-middle text-center">
+          <span class="badge ${badgeClass} rounded-pill px-3">${estado}</span>
+        </td>
+        <td class="text-muted small">${fecha}</td>
+      </tr>`;
+  }).join("");
+}
+
+// --- 4. ACCIONES ---
+
+/**
+ * Establece el contexto del documento actual y navega a la vista de detalle.
+ * @param {string} idDoc - ID raíz del documento seleccionado.
+ */
+function abrirDocumento(idDoc) {
+  window.ID_DOCUMENTO_ACTUAL = idDoc;
+  cargarVista("page_doc_detalle");
+}
+
+/**
+ * Captura el archivo seleccionado, lo convierte a Base64 y lo envía al servidor para registro.
+ */
+function ejecutarSubida() {
+  const fileInput = document.getElementById("fileInput");
+  const mensaje = document.getElementById("mensajeSubida");
+  const btn = document.querySelector("#modalSubir .btn-primary");
+
+  if (!fileInput || fileInput.files.length === 0) {
+    mostrarAlerta(mensaje, "warning", "Selecciona un PDF.");
+    return;
+  }
+
+  const file = fileInput.files[0];
+  toggleSubidaUI(btn, mensaje, true);
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const base64 = e.target.result.split(",")[1];
+    
+    google.script.run
+      .withSuccessHandler(() => {
+        mostrarAlerta(mensaje, "success", "Documento registrado con éxito.");
+        limpiarYRefrescarSubida(fileInput, btn);
+      })
+      .withFailureHandler((err) => {
+        toggleSubidaUI(btn, mensaje, false);
+        mostrarAlerta(mensaje, "danger", `Error: ${err.message}`);
+      })
+      .orquestarSubidaOriginal(file.name, base64);
+  };
+  reader.readAsDataURL(file);
+}
+
+// --- 5. HELPERS VISUALES ---
+
+/**
+ * Controla la visualización del estado de carga dentro de la tabla.
+ * @param {HTMLElement} tbody - El cuerpo de la tabla.
+ * @param {boolean} show - Determina si se muestra u oculta el spinner.
+ */
+function mostrarLoadingTabla(tbody, show) {
+  tbody.dataset.cargando = show ? "true" : "false";
+  if (show) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="3" class="text-center text-muted py-4">
+          <div class="spinner-border spinner-border-sm text-primary me-2"></div>
+          Sincronizando...
+        </td>
+      </tr>`;
+  }
+}
+
+/**
+ * Renderiza un mensaje de alerta en un contenedor específico.
+ * @param {HTMLElement} contenedor - El elemento donde se insertará la alerta.
+ * @param {string} tipo - Tipo de alerta Bootstrap (success, danger, warning, info).
+ * @param {string} texto - Contenido del mensaje.
+ */
+function mostrarAlerta(contenedor, tipo, texto) {
+  if (contenedor) {
+    contenedor.innerHTML = `<div class="alert alert-${tipo} py-2 mb-0">${texto}</div>`;
+  }
+}
+
+/**
+ * Alterna el estado de los botones y mensajes durante el proceso de subida.
+ * @param {HTMLElement} btn - Botón de acción a bloquear/desbloquear.
+ * @param {HTMLElement} mensaje - Contenedor de feedback.
+ * @param {boolean} isProcessing - Estado actual del proceso.
+ */
+function toggleSubidaUI(btn, mensaje, isProcessing) {
+  if (btn) btn.disabled = isProcessing;
+  if (isProcessing && mensaje) {
+    mensaje.innerHTML = `<div class="alert alert-info py-2 mb-0"><div class="spinner-border spinner-border-sm me-2"></div>Enviando...</div>`;
+  }
+}
+
+/**
+ * Limpia el formulario y oculta el modal tras una subida exitosa.
+ * @param {HTMLElement} input - El input de tipo archivo.
+ * @param {HTMLElement} btn - El botón de confirmación.
+ */
+function limpiarYRefrescarSubida(input, btn) {
+  setTimeout(() => {
+    input.value = "";
+    if (btn) btn.disabled = false;
+    const modalEl = document.getElementById("modalSubir");
+    const instance = bootstrap.Modal.getInstance(modalEl);
+    if (instance) instance.hide();
+    cargarTablaDocumentos(); 
+  }, 1500);
+}
+</script>

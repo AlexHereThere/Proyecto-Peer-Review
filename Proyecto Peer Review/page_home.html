@@ -1,0 +1,47 @@
+<?!= include('component_title'); ?>
+<h1 class="text-center mt-2 mb-2">
+  Hola <span id="usernameHome"> </span>
+</h1>
+<div class="row mt-4">
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-body">
+        <h5>Sobre Nosotros</h5>
+        <p>¡Conoce los creadores de la aplicación web! Tambien se tiene información sobre la misión, visión y objetivo del porqué la existencia de la aplicación.</p>
+        <button 
+          class="btn btn-primary" 
+          onclick="cargarVista('page_nosotros')">
+          Ir
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-body">
+        <h5>Manual</h5>
+        <p>¡Conoce todo lo que es posible con esta aplicacion web! En el manual viene informacion de sobre como subir archivos, crear rubricas, revisar o corregir trabajos, etc.</p>
+        <button 
+          class="btn btn-primary" 
+          onclick="cargarVista('page_guia')">
+          Ir
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-body">
+        <h5>Mis Documento</h5>
+        <p>Acceso rapido para revisar estado de trabajos o ingresar nuevos.</p>
+        <button 
+          class="btn btn-primary" 
+          onclick="cargarVista('page_documentos')">
+          Ir
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
