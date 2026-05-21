@@ -1,0 +1,18 @@
+<script>
+/**
+ * js_home.html - Lógica de Bienvenida
+ */
+
+function cargarHome() {
+  const homeName = document.getElementById("usernameHome");
+
+  google.script.run
+    .withSuccessHandler((user) => {
+      if (homeName) homeName.innerText = user.name;
+    })
+    .withFailureHandler(err => console.error("Error al obtener info de Google:", err))
+    .sacarGoogleInfoUsuario();
+}
+
+cargarHome();
+</script>

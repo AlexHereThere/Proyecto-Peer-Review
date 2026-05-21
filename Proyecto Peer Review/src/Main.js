@@ -14,65 +14,53 @@ function getSpreed() {
 
 /**
  * Accede a una hoja específica dentro del Spreadsheet principal utilizando su nombre.
- * Esta función depende de la existencia de getSpreed() para obtener el Spreadsheet activo.
- * * @param {string} nombre - El nombre de la pestaña/hoja (ej. "Documentos", "Usuarios").
+ * @param {string} nombre - El nombre de la pestaña/hoja (ej. "Documentos", "Usuarios").
  * @returns {GoogleAppsScript.Spreadsheet.Sheet} El objeto de la hoja solicitada.
  */
 function getSheetByName(nombre) {
   return getSpreed().getSheetByName(nombre);
 }
 
-/**
- * Obtiene la hoja de "Usuarios".
- * @returns {GoogleAppsScript.Spreadsheet.Sheet}
- */
+/** Obtiene la hoja de "Usuarios". */
 function getSheet_USR() { return getSpreed().getSheetByName("Usuarios"); }
 
-/**
- * Obtiene la hoja de "Documentos".
- * @returns {GoogleAppsScript.Spreadsheet.Sheet}
- */
+/** Obtiene la hoja de "Documentos". */
 function getSheet_DOC() { return getSpreed().getSheetByName("Documentos"); }
 
-/**
- * Obtiene la hoja de "Versiones".
- * @returns {GoogleAppsScript.Spreadsheet.Sheet}
- */
+/** Obtiene la hoja de "Versiones". */
 function getSheet_VER() { return getSpreed().getSheetByName("Versiones"); }
 
-/**
- * Obtiene la hoja de "Revisiones".
- * @returns {GoogleAppsScript.Spreadsheet.Sheet}
- */
+/** Obtiene la hoja de "Revisiones". */
 function getSheet_REV() { return getSpreed().getSheetByName("Revisiones"); }
 
-/**
- * Obtiene la hoja de "Actividad".
- * @returns {GoogleAppsScript.Spreadsheet.Sheet}
- */
+/** Obtiene la hoja de "Actividad". */
 function getSheet_ACT() { return getSpreed().getSheetByName("Actividad"); }
-
+function getSheet_CON() { return getSpreed().getSheetByName("Configuracion"); }
 
 var Qunit = QUnitGS2.QUnit; // Pruebas Unitarias
 
 /**
  * Función principal de Google Apps Script para manejar solicitudes GET.
- * Inicializa la infraestructura del sistema y sirve la interfaz de usuario.
+ * Inicializa la infraestructura del sistema, procesa acciones de correos y sirve la interfaz.
  * @returns {HtmlService.HtmlOutput} El contenido HTML configurado.
  */
 function doGet(e) {
-  // --- Para Pruebas Unitarias ---
-  if (e && e.parameter && e.parameter.mode === 'test') { //?mode=test
+  // --- 1. MODO: PRUEBAS UNITARIAS ---
+  if (e && e.parameter && e.parameter.mode === 'test') { // ?mode=test
     QUnitGS2.init();
-    
-    //PU_Revisiones(); 
     definirPruebasUnitarias();
-
     QUnitGS2.QUnit.start();
     return QUnitGS2.getHtml();
   }
 
-  // --- Aplicacion ---
+  // --- 2. MODO: ACCIÓN DESDE CORREO ELECTRÓNICO (NUEVO INTERCEPTOR) ---
+  // Si la URL contiene el parámetro "action" (ej: ?action=aceptar&id=...), 
+  // detenemos la carga normal y procesamos la aceptación/rechazo.
+  if (e && e.parameter && e.parameter.action) {
+    return manejarAccionCorreo(e.parameter); 
+  }
+
+  // --- 3. MODO: CARGA NORMAL DE LA APLICACIÓN ---
   inicializarSistema();
 
   const template = HtmlService.createTemplateFromFile('index');
@@ -106,4 +94,8 @@ function include(filename) {
 function getVista(nombre){
   const template = HtmlService.createTemplateFromFile(nombre);
   return template.evaluate().getContent();
+}
+
+function recargarSidebarHTML() {
+  return HtmlService.createTemplateFromFile('component_sidebar').evaluate().getContent();
 }

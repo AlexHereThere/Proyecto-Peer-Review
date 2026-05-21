@@ -1,0 +1,134 @@
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<div class="card mb-4 shadow-sm">
+    <div class="card-body">
+        <h4 class="card-title">Datos de Usuario</h4>
+        
+        <div class="row mb-3">
+            <div class="col-md-8 border rounded p-3">
+                <p class="mb-2"><strong>Nombre:</strong> <span id="u-nombre">Cargando...</span></p>
+                <p class="mb-0"><strong>Email:</strong> <span id="u-email">Cargando...</span></p>
+            </div>
+
+            <div class="col-md-4 border rounded p-3 mt-3 mt-md-0">
+                <p class="mb-2">Roles:</p>
+                <div id="u-roles-container" class="d-flex flex-wrap gap-2">
+                    </div>
+            </div>
+        </div>
+
+        <div id="stats-roles-container" class="mt-4">
+
+            <div id="card-stats-autor" class="card mb-4 shadow-sm border-start border-primary border-4 d-none">
+                <div class="card-body">
+                    <h5 class="card-title text-primary fw-bold mb-4"><i class="bi bi-pen"></i> Mis Trabajos</h5>
+                    <div class="row text-center gy-3">
+                        <div class="col-6 col-md-3">
+                            <div class="rounded-circle bg-primary-subtle text-primary mx-auto d-flex align-items-center justify-content-center mb-2" style="width: 50px; height: 50px;">
+                                <i class="bi bi-hourglass-split fs-4"></i>
+                            </div>
+                            <h3 class="fw-bold text-dark mb-0" id="stat-aut-revision">0</h3>
+                            <p class="small text-muted mb-0">En Revisión</p>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="rounded-circle bg-secondary-subtle text-secondary mx-auto d-flex align-items-center justify-content-center mb-2" style="width: 50px; height: 50px;">
+                                <i class="bi bi-file-earmark-text fs-4"></i>
+                            </div>
+                            <h3 class="fw-bold text-dark mb-0" id="stat-aut-borradores">0</h3>
+                            <p class="small text-muted mb-0">Pendientes de Revisión</p>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="rounded-circle bg-success-subtle text-success mx-auto d-flex align-items-center justify-content-center mb-2" style="width: 50px; height: 50px;">
+                                <i class="bi bi-check-circle fs-4"></i>
+                            </div>
+                            <h3 class="fw-bold text-dark mb-0" id="stat-aut-aceptados">0</h3>
+                            <p class="small text-muted mb-0">Aceptados</p>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="rounded-circle bg-danger-subtle text-danger mx-auto d-flex align-items-center justify-content-center mb-2" style="width: 50px; height: 50px;">
+                                <i class="bi bi-exclamation-triangle fs-4"></i>
+                            </div>
+                            <h3 class="fw-bold text-dark mb-0" id="stat-aut-corregir">0</h3>
+                            <p class="small text-muted mb-0">Por Corregir</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="card-stats-revisor" class="card mb-4 shadow-sm border-start border-warning border-4 d-none">
+                <div class="card-body">
+                    <h5 class="card-title text-warning-emphasis fw-bold mb-4"><i class="bi bi-eye"></i> Revisiones</h5>
+                    <div class="row text-center gy-3">
+                        <div class="col-4">
+                            <div class="rounded-circle bg-warning-subtle text-warning-emphasis mx-auto d-flex align-items-center justify-content-center mb-2" style="width: 50px; height: 50px;">
+                                <i class="bi bi-play-circle fs-4"></i>
+                            </div>
+                            <h3 class="fw-bold text-dark mb-0" id="stat-rev-espera">0</h3>
+                            <p class="small text-muted mb-0">Por Empezar</p>
+                        </div>
+                        <div class="col-4">
+                            <div class="rounded-circle bg-info-subtle text-info mx-auto d-flex align-items-center justify-content-center mb-2" style="width: 50px; height: 50px;">
+                                <i class="bi bi-gear-wide-connected fs-4"></i>
+                            </div>
+                            <h3 class="fw-bold text-dark mb-0" id="stat-rev-progreso">0</h3>
+                            <p class="small text-muted mb-0">En Progreso</p>
+                        </div>
+                        <div class="col-4">
+                            <div class="rounded-circle bg-success-subtle text-success mx-auto d-flex align-items-center justify-content-center mb-2" style="width: 50px; height: 50px;">
+                                <i class="bi bi-bookmark-check fs-4"></i>
+                            </div>
+                            <h3 class="fw-bold text-dark mb-0" id="stat-rev-completados">0</h3>
+                            <p class="small text-muted mb-0">Terminadas</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="card-stats-admin" class="card mb-3 shadow-sm border-start border-success border-4 d-none">
+                <div class="card-body">
+                    <h5 class="card-title text-success fw-bold mb-4"><i class="bi bi-shield-check"></i> Trabajos en Sistema</h5>
+                    <div class="row text-center gy-3">
+                        <div class="col-6 col-md-3">
+                            <div class="rounded-circle bg-danger-subtle text-danger mx-auto d-flex align-items-center justify-content-center mb-2" style="width: 50px; height: 50px;">
+                                <i class="bi bi-person-dash fs-4"></i>
+                            </div>
+                            <h3 class="fw-bold text-dark mb-0" id="stat-adm-pendiente">0</h3>
+                            <p class="small text-muted mb-0">Pendiente de Revisor</p>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="rounded-circle bg-success-subtle text-success mx-auto d-flex align-items-center justify-content-center mb-2" style="width: 50px; height: 50px;">
+                                <i class="bi bi-file-earmark-check fs-4"></i>
+                            </div>
+                            <h3 class="fw-bold text-dark mb-0" id="stat-adm-aprobados">0</h3>
+                            <p class="small text-muted mb-0">Aprobados</p>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="rounded-circle bg-primary-subtle text-primary mx-auto d-flex align-items-center justify-content-center mb-2" style="width: 50px; height: 50px;">
+                                <i class="bi bi-journal-text fs-4"></i>
+                            </div>
+                            <h3 class="fw-bold text-dark mb-0" id="stat-adm-revision">0</h3>
+                            <p class="small text-muted mb-0">En Revisión</p>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="rounded-circle bg-dark-subtle text-dark mx-auto d-flex align-items-center justify-content-center mb-2" style="width: 50px; height: 50px;">
+                                <i class="bi bi-database fs-4"></i>
+                            </div>
+                            <h3 class="fw-bold text-success mb-0" id="stat-adm-total">0</h3>
+                            <p class="small fw-bold text-muted mb-0">Total</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div> </div> </div> <div class="card shadow-sm">
+    <div class="card-body">
+        <h4 class="card-title">Actividad Reciente</h4>
+        <ul class="list-group list-group-flush" id="lista-actividad">
+            <li class="list-group-item text-center p-4">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Cargando...</span>
+                </div>
+                <p class="mt-2 mb-0 text-muted">Sincronizando con el servidor...</p>
+            </li>
+        </ul>
+    </div>
+</div>

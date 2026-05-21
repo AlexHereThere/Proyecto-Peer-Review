@@ -1,0 +1,81 @@
+<div class="container mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0 fw-bold text-body">
+      <i class="bi bi-folder-fill text-primary me-2"></i>Mis Documentos
+    </h4>
+    <button class="btn btn-success shadow-sm d-flex align-items-center" data-bs-toggle="modal" data-bs-target="#modalSubir">
+      <i class="bi bi-plus-lg me-1"></i> Nuevo Documento
+    </button>
+  </div>
+
+  <div class="card mb-4 border-0 shadow-sm bg-body-tertiary">
+    <div class="card-body py-3">
+      <div class="d-flex gap-2">
+        <div class="input-group shadow-sm-inset">
+          <span class="input-group-text bg-body"><i class="bi bi-search text-muted"></i></span>
+          <input 
+            type="search" 
+            id="buscador" 
+            class="form-control" 
+            placeholder="Buscar Documentos..." 
+            oninput="filtrarDocumentos()"
+          >
+        </div>
+        <div class="dropdown">
+          <button class="btn btn-primary dropdown-toggle shadow-sm d-flex align-items-center" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="bi bi-filter-left me-1"></i> Buscar Por: <span id="criterioActual" class="fw-bold ms-1">Nombre</span>
+          </button>
+          <ul class="dropdown-menu dropdown-menu-end shadow border-0">
+            <li>
+              <a class="dropdown-item d-flex align-items-center" href="#" onclick="setBuscarPor('Nombre'); return false;">
+                <i class="bi bi-file-earmark-text me-2"></i> Nombre
+              </a>
+            </li>
+            <li>
+              <a class="dropdown-item d-flex align-items-center" href="#" onclick="setBuscarPor('Estado'); return false;">
+                <i class="bi bi-tags me-2"></i> Estado
+              </a>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="table-responsive shadow-sm rounded">
+    <table class="table table-hover table-bordered mb-0">
+      <thead class="table-dark">
+        <tr>
+          <th class="align-middle">Nombre de Documento</th>
+          <th style="width: 15%;" class="text-center align-middle">Estado</th>
+          <th style="width: 15%;" class="align-middle">Fecha</th>
+          <th style="width: 20%;" class="text-center align-middle">Acciones Disponibles</th>
+        </tr>
+      </thead>
+      <tbody id="tablaDocumentos">
+        </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="modal fade" id="modalSubir" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content shadow">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title fw-bold">Subir Trabajo</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Selecciona tu archivo PDF</label>
+          <input type="file" id="fileInput" class="form-control" accept="application/pdf">
+        </div>
+        <div id="mensajeSubida" class="mt-2"></div>
+      </div>
+      <div class="modal-footer bg-body-tertiary">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" id="btnSubir" class="btn btn-primary" onclick="ejecutarSubida()">Subir Documento</button>
+      </div>
+    </div>
+  </div>
+</div>

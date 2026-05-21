@@ -1,0 +1,210 @@
+<div class="container mt-4">
+
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0 fw-bold text-body">
+      <i class="bi bi-shield-lock-fill text-primary me-2"></i>Panel de Administración
+    </h4>
+    <div class="d-flex gap-2">
+      <button class="btn btn-sm btn-outline-secondary shadow-sm d-flex align-items-center" onclick="cargarAdmin()">
+        <i class="bi bi-arrow-clockwise me-1"></i> Actualizar
+      </button>
+      <button class="btn btn-sm btn-outline-primary shadow-sm d-flex align-items-center" onclick="abrirModalUsuarios()">
+        <i class="bi bi-people-fill me-1"></i> Gestionar Usuarios
+      </button>
+    </div>
+  </div>
+
+  <div class="card mb-4 border-0 shadow-sm bg-body-tertiary">
+    <div class="card-body py-3">
+      <div class="d-flex gap-2">
+        <div class="input-group shadow-sm-inset">
+          <span class="input-group-text bg-body"><i class="bi bi-search text-muted"></i></span>
+          <input
+            type="search"
+            id="buscadorAdmin"
+            class="form-control"
+            placeholder="Escribe para buscar..."
+            oninput="filtrarAdmin()"
+          >
+        </div>
+        <div class="dropdown">
+          <button class="btn btn-primary dropdown-toggle shadow-sm d-flex align-items-center" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="bi bi-filter-left me-1"></i> Filtrar por: <span id="criterioAdmin" class="fw-bold ms-1">Nombre</span>
+          </button>
+          <ul class="dropdown-menu dropdown-menu-end shadow border-0">
+            <li>
+              <a class="dropdown-item d-flex align-items-center" href="#" onclick="setCriterioAdmin('Nombre'); return false;">
+                <i class="bi bi-file-earmark-text me-2"></i> Nombre del Documento
+              </a>
+            </li>
+            <li>
+              <a class="dropdown-item d-flex align-items-center" href="#" onclick="setCriterioAdmin('Autor'); return false;">
+                <i class="bi bi-person me-2"></i> Email Autor
+              </a>
+            </li>
+            <li>
+              <a class="dropdown-item d-flex align-items-center" href="#" onclick="setCriterioAdmin('Estado'); return false;">
+                <i class="bi bi-tags me-2"></i> Estado de Evaluación
+              </a>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="table-responsive shadow-sm rounded">
+    <table class="table table-hover table-bordered mb-0">
+      <thead class="table-dark">
+        <tr>
+          <th style="width: 35%;" class="align-middle">Nombre del Documento</th>
+          <th style="width: 20%;" class="align-middle">Email Autor</th>
+          <th style="width: 15%;" class="text-center align-middle">Estado</th>
+          <th style="width: 15%;" class="align-middle">Fecha de Envío</th>
+          <th style="width: 20%;" class="text-center align-middle">Acciones Disponibles</th>
+        </tr>
+      </thead>
+      <tbody id="tablaAdmin">
+        </tbody>
+    </table>
+  </div>
+
+</div>
+
+<div class="modal fade" id="modalUsuarios" tabindex="-1" aria-labelledby="modalUsuariosLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header bg-primary text-white border-bottom-0">
+        <h5 class="modal-title fw-bold" id="modalUsuariosLabel">
+          <i class="bi bi-sliders me-2"></i>Control de Privilegios de Acceso
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="msgUsuarios" class="mb-3 small fw-bold text-center border-0 rounded p-1"></div>
+        <div class="table-responsive border rounded bg-body-tertiary" style="max-height: 350px; overflow-y: auto;">
+          <table class="table table-hover table-bordered mb-0 align-middle">
+            <thead class="table-dark sticky-top">
+              <tr>
+                <th class="align-middle ps-3">Nombre Completo</th>
+                <th class="align-middle">Email Institucional</th>
+                <th class="text-center align-middle" style="width: 12%;">Autor</th>
+                <th class="text-center align-middle" style="width: 12%;">Revisor</th>
+                <th class="text-center align-middle" style="width: 12%;">Admin</th>
+              </tr>
+            </thead>
+            <tbody id="tablaUsuarios" class="bg-white">
+              <tr>
+                <td colspan="5" class="text-center text-muted py-3">
+                  <div class="spinner-border spinner-border-sm text-primary me-2"></div>
+                  Abriendo base de datos de usuarios...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer bg-body-tertiary border-top-0 py-2">
+        <button type="button" class="btn btn-secondary shadow-sm" data-bs-dismiss="modal">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="modalAsignar" tabindex="-1" aria-labelledby="modalAsignarLabel" aria-hidden="true" data-bs-backdrop="static">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header bg-primary text-white border-bottom-0">
+        <h5 class="modal-title fw-bold" id="modalAsignarLabel">
+          <i class="bi bi-person-badge-fill me-2"></i>Asignar Evaluador Técnico
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="bg-body-tertiary rounded p-2 mb-3 border">
+          <p class="text-secondary small mb-0 text-truncate">
+            <i class="bi bi-journal-text me-1"></i>Documento: <strong id="nombreDocAsignar" class="text-body"></strong>
+          </p>
+        </div>
+
+        <ul class="nav nav-tabs border-bottom-0 mb-0" id="tabsVersionesAdmin" role="tablist"></ul>
+        
+        <div id="listaRevisoresAsignados" class="border rounded-bottom p-2 mb-3 bg-body-tertiary" style="min-height: 55px; max-height: 160px; overflow-y: auto;"></div>
+
+        <div class="form-check p-3 bg-body-tertiary rounded border border-dashed mb-3">
+          <div class="ms-2">
+            <input
+              class="form-check-input"
+              type="checkbox"
+              id="checkCopiarRevisores"
+              onchange="guardarCopiarRevisores()"
+            >
+            <label class="form-check-label small fw-semibold text-body ms-1" for="checkCopiarRevisores">
+              Copiar evaluadores de V1 a nuevas versiones
+            </label>
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <p class="fw-bold small mb-0 text-secondary">
+              <i class="bi bi-journal-check me-1"></i>Dictaminadores registrados:
+            </p>
+            <select id="tipoRevisionListaAdmin" class="form-select form-select-sm w-50 shadow-sm" style="font-size: 0.8rem;">
+              <option value="Doble Ciego" selected>Doble Ciego</option>
+              <option value="Simple Ciego">Simple Ciego</option>
+              <option value="Abierta">Abierta</option>
+            </select>
+          </div>
+          
+          <div id="listaRevisoresSistema" class="border rounded p-2 bg-body" style="max-height: 130px; overflow-y: auto;">
+            <div class="text-center text-muted py-2">
+              <div class="spinner-border spinner-border-sm text-primary me-2"></div>
+              Cargando lista institucional...
+            </div>
+          </div>
+        </div>
+
+        <div class="d-flex align-items-center my-3 text-muted small text-center">
+          <hr class="flex-grow-1 my-0">
+          <span class="mx-2 fw-bold text-uppercase text-secondary" style="font-size: 0.65rem; letter-spacing: 0.5px;">O registrar por invitación externa</span>
+          <hr class="flex-grow-1 my-0">
+        </div>
+
+        <div class="mb-2">
+          <div class="mb-2">
+            <label for="tipoRevisionCorreoAdmin" class="form-label text-muted small fw-medium mb-1">Modalidad de arbitraje científico:</label>
+            <select id="tipoRevisionCorreoAdmin" class="form-select form-select-sm shadow-sm">
+              <option value="Doble Ciego" selected>Tipo: Doble Ciego (Identidad Oculta Bilateral)</option>
+              <option value="Simple Ciego">Tipo: Simple Ciego (Revisor conoce al Autor)</option>
+              <option value="Abierta">Tipo: Abierta (Identidades Descubiertas)</option>
+            </select>
+          </div>
+          
+          <div class="input-group shadow-sm">
+            <span class="input-group-text bg-body text-muted"><i class="bi bi-envelope-plus-fill"></i></span>
+            <input
+              type="email"
+              id="emailRevisorAdmin"
+              class="form-control form-control-sm"
+              placeholder="nombre.apellido@uabc.edu.mx"
+            >
+            <button id="btnConfirmarAsignar" class="btn btn-primary fw-bold px-3 btn-sm" type="button" onclick="confirmarAsignacion()">
+              Asignar
+            </button>
+          </div>
+        </div>
+        
+        <div id="msgAsignarAdmin" class="mt-3 small fw-bold text-center border-0 rounded p-2 d-none" role="alert"></div>
+      </div>
+      
+      <div class="modal-footer bg-body-tertiary border-top-0 py-2">
+        <button type="button" class="btn btn-secondary shadow-sm" data-bs-dismiss="modal">Cerrar Ventana</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .border-dashed { border-style: dashed !important; border-width: 1.5px !important; }
+</style>

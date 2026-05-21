@@ -43,10 +43,10 @@ function actualizarInterfaz(data) {
 
     // Mapeo: Rol -> Categoría de Bootstrap (que ya tiene tus colores)
     const mapaColores = {
-      'Autor': 'bg-primary',   // Usará tu verde (#00723f)
-      'Revisor': 'bg-secondary', // Usará tu naranja/oro (#dd971a)
-      'Admin': 'bg-success',   // Usará tu azul (#20419A)
-      'Editor': 'bg-info'      // Usará tu púrpura (#630df0)
+      'Autor': 'bg-primary',   // Usará verde (#00723f)
+      'Revisor': 'bg-secondary', // Usará naranja/oro (#dd971a)
+      'Admin': 'bg-success',   // Usará azul (#20419A)
+      'Editor': 'bg-info'      // Usará púrpura (#630df0)
     };
 
     const roles = data.perfil.rol.split(',').map(rol => rol.trim());
@@ -69,13 +69,50 @@ function actualizarInterfaz(data) {
     });
   }
 
-  // Llenar Contadores (Estadísticas)
-  // Nota: Estos también se verán afectados por tus nuevos colores si usas las clases de Bootstrap
-  if(document.getElementById('stat-revisados')) {
-      document.getElementById('stat-revisados').innerText = data.stats.revisados;
-      document.getElementById('stat-pendientes').innerText = data.stats.pendientes;
-      document.getElementById('stat-terminados').innerText = data.stats.terminados;
-      document.getElementById('stat-corregir').innerText = data.stats.corregir;
+  // ==========================================
+  // CONTROL DE TARJETAS DE ESTADÍSTICAS POR ROL
+  // ==========================================
+  const stats = data.stats;
+
+  // 1. GESTIÓN ROL: AUTOR
+  const cardAutor = document.getElementById('card-stats-autor');
+  if (cardAutor) {
+    if (stats.esAutor) {
+      cardAutor.classList.remove('d-none');
+      document.getElementById('stat-aut-revision').innerText = stats.autor.enRevision;
+      document.getElementById('stat-aut-borradores').innerText = stats.autor.borradores;
+      document.getElementById('stat-aut-aceptados').innerText = stats.autor.aceptados;
+      document.getElementById('stat-aut-corregir').innerText = stats.autor.porCorregir;
+    } else {
+      cardAutor.classList.add('d-none');
+    }
+  }
+
+  // 2. GESTIÓN ROL: REVISOR
+  const cardRevisor = document.getElementById('card-stats-revisor');
+  if (cardRevisor) {
+    if (stats.esRevisor) {
+      cardRevisor.classList.remove('d-none');
+      document.getElementById('stat-rev-espera').innerText = stats.revisor.porEmpezar;
+      document.getElementById('stat-rev-progreso').innerText = stats.revisor.enProgreso;
+      document.getElementById('stat-rev-completados').innerText = stats.revisor.completados;
+    } else {
+      cardRevisor.classList.add('d-none');
+    }
+  }
+
+  // 3. GESTIÓN ROL: ADMIN
+  const cardAdmin = document.getElementById('card-stats-admin');
+  if (cardAdmin) {
+    if (stats.esAdmin) {
+      cardAdmin.classList.remove('d-none');
+      document.getElementById('stat-adm-pendiente').innerText = stats.admin.pentienteRevisor;
+      document.getElementById('stat-adm-aprobados').innerText = stats.admin.aprobados;
+      document.getElementById('stat-adm-revision').innerText = stats.admin.enRevision;
+      document.getElementById('stat-adm-total').innerText = stats.admin.totalSistema;
+    } else {
+      cardAdmin.classList.add('d-none');
+    }
   }
 
   // Renderizar Lista de Actividad Reciente

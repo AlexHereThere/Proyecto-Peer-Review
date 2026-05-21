@@ -3,67 +3,103 @@
  */
 
 /**
- * Obtiene los datos consolidados para el dashboard, incluyendo perfil,
- * estadísticas de documentos y actividad reciente del usuario.
- * * @returns {Object} Objeto con perfil, estadísticas y lista de actividades.
+ * Obtiene los datos consolidados y segmentados por rol para el dashboard.
+ * @returns {Object} Perfil, estadísticas segmentadas por rol y lista de actividades.
  */
 function getDashboardData() {
   const userEmail = Session.getActiveUser().getEmail();
   
-  // Obtener Perfil 
+  // 1. Obtener Perfil y Roles
   const userSheet = getSheet_USR();
   const userData = userSheet.getDataRange().getValues();
   const userRow = userData.find(row => row[0] === userEmail) || [userEmail, "Usuario Nuevo", "Autor"];
+  
+  const rolesString = userRow[2] || "Autor";
+  const misRoles = rolesString.split(',').map(r => r.trim());
 
-  // Obtener Estadísticas desde la tabla Documentos
+  // 2. Obtener datos maestros de Documentos y Revisiones
   const docSheet = getSheet_DOC();
   const docs = docSheet.getDataRange().getValues();
-  docs.shift(); 
-  
-  // Filtrado de documentos por usuario
-  const misDocs = docs.filter(row => row[7] === userEmail); 
-  
-  // Mapeo de estados basado en la columna 'Estado' (índice 6)
+  docs.shift(); // Remover cabecera
+
+  // Inicializar estructuras de estadísticas
   const stats = {
-    revisados: misDocs.filter(r => r[6] === "Revisado").length,
-    pendientes: misDocs.filter(r => r[6] === "Pendiente").length,
-    terminados: misDocs.filter(r => r[6] === "Aprobado").length,
-    corregir: misDocs.filter(r => r[6] === "A Corregir").length,
-    total: misDocs.length
+    esAutor: misRoles.includes("Autor"),
+    esRevisor: misRoles.includes("Revisor"),
+    esAdmin: misRoles.includes("Admin"),
+    autor: { enRevision: 0, borradores: 0, aceptados: 0, porCorregir: 0 },
+    revisor: { porEmpezar: 0, enProgreso: 0, completados: 0 },
+    admin: { pentienteRevisor: 0, aprobados: 0, enRevision: 0, totalSistema: docs.length }
   };
 
-  // Obtener Actividad Reciente
-  const actividades = getRecentActivity();
+  // --- MÉTRICAS DE AUTOR Y ADMIN (Un solo recorrido a la tabla Documentos) ---
+  for (let i = 0; i < docs.length; i++) {
+    const doc = docs[i];
+    const estadoDoc = doc[6];  // Columna Estado
+    const autorDoc = doc[7];   // Columna Email_Autor
+
+    // Si el usuario es Autor de este documento, acumulamos sus métricas
+    if (stats.esAutor && autorDoc === userEmail) {
+      if (estadoDoc === "En Revisión") stats.autor.enRevision++;
+      else if (estadoDoc === "Pendiente") stats.autor.borradores++;
+      else if (estadoDoc === "Aprobado") stats.autor.aceptados++;
+      else if (estadoDoc === "A Corregir") stats.autor.porCorregir++;
+    }
+
+    // Si el usuario es Admin, acumulamos métricas globales del sistema
+    if (stats.esAdmin) {
+      if (estadoDoc === "Pendiente") stats.admin.pentienteRevisor++;
+      else if (estadoDoc === "Aprobado") stats.admin.aprobados++;
+      else if (estadoDoc === "En Revisión") stats.admin.enRevision++;
+    }
+  }
+
+  // --- MÉTRICAS DE REVISOR (Escaneo a la tabla Revisiones) ---
+  if (stats.esRevisor) {
+    const revSheet = getSheet_REV();
+    if (revSheet) {
+      const revisiones = revSheet.getDataRange().getValues();
+      revisiones.shift(); // Remover cabecera
+      
+      for (let j = 0; j < revisiones.length; j++) {
+        const rev = revisiones[j];
+        const revisorEmail = rev[3]; // Columna Email_Revisor
+        const estadoRev = rev[4];    // Columna Estado (de la revisión)
+
+        if (revisorEmail === userEmail) {
+          if (estadoRev === "Asignado") stats.revisor.porEmpezar++;
+          else if (estadoRev === "En Revisión") stats.revisor.enProgreso++;
+          else if (estadoRev === "A Corregir" || estadoRev === "Aprobado") stats.revisor.completados++;
+        }
+      }
+    }
+  }
 
   return {
-    perfil: {
-      nombre: userRow[1],
-      email: userEmail,
-      rol: userRow[2]
-    },
+    perfil: { nombre: userRow[1], email: userEmail, rol: rolesString },
     stats: stats,
-    recientes: actividades
+    recientes: getRecentActivity()
   };
 }
 
 /**
- * Registra una nueva entrada de actividad en la hoja correspondiente.
- * * @param {string} titulo - El título de la actividad.
+ * Registra una nueva entrada de actividad en la hoja correspondiente a nombre del dueño del trabajo.
+ * * @param {string} emailDueno - El correo electrónico del dueño del trabajo/propiedad.
+ * @param {string} titulo - El título de la actividad.
  * @param {string} tipo - El tipo de categoría de la acción.
  * @param {string} detalle - Descripción detallada de lo ocurrido.
  * @param {string} claseCSS - Nombre de la clase CSS para el estilo en la UI.
  * @param {string} accion_enlace - URL o identificador de la acción asociada.
  */
-function registrarActividad(titulo, tipo, detalle, claseCSS, accion_enlace) {
+function registrarActividad(emailDueno, titulo, tipo, detalle, claseCSS, accion_enlace) {
   const sheet = getSheet_ACT();
   if (!sheet) return;
 
-  const email = Session.getActiveUser().getEmail();
   const fecha = new Date();
   
   const payload = [
     "ACT-" + fecha.getTime(), 
-    email, 
+    emailDueno, 
     titulo, 
     tipo, 
     detalle, 

@@ -12,11 +12,11 @@ let todosLosDocs = [];
 let buscarPor = "Nombre";
 
 /** @const {Object} Mapeo de estados de documentos a clases CSS de Bootstrap */
-const BADGE_ESTADO = {
+const BADGE_ESTADO_DOC = {
   "Pendiente": "bg-secondary",
   "En revisión": "bg-warning text-dark",
+  "En Revisión": "bg-warning text-dark", 
   "A Corregir": "bg-danger",
-  "Revisado": "bg-primary",
   "Aprobado": "bg-success"
 };
 
@@ -48,7 +48,8 @@ function cargarTablaDocumentos() {
     })
     .withFailureHandler((err) => {
       tbody.dataset.cargando = "false";
-      tbody.innerHTML = `<tr><td colspan="3" class="text-center text-danger py-3">Error: ${err.message}</td></tr>`;
+      // CORREGIDO: Ajustado a un colspan de 4 columnas por la nueva estructura
+      tbody.innerHTML = `<tr><td colspan="4" class="text-center text-danger py-3"><i class="bi bi-exclamation-triangle-fill me-1"></i> Error: ${err.message}</td></tr>`;
     })
     .obtenerDocumentos_Usuario();
 }
@@ -90,26 +91,29 @@ function renderTablaDocumentos(docs) {
   if (!tbody) return;
 
   if (!docs || docs.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="3" class="text-center text-muted py-3">No se encontraron documentos registrados.</td></tr>`;
+    // CORREGIDO: Ajustado a un colspan de 4 columnas
+    tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted py-3">No se encontraron documentos registrados.</td></tr>`;
     return;
   }
 
   tbody.innerHTML = docs.map(doc => {
     const { fecha, nombre, idRaiz, estado } = doc;
-    const badgeClass = BADGE_ESTADO[estado] || "bg-secondary";
+    const badge = BADGE_ESTADO_DOC[estado] || "bg-secondary";
 
     return `
       <tr>
-        <td class="align-middle">
-          <a class="fw-semibold link-primary text-decoration-none" href="#" 
-             onclick="abrirDocumento('${idRaiz}'); return false;">
-            <i class="bi bi-file-earmark-pdf me-2"></i>${nombre}
-          </a>
+        <td class="align-middle fw-semibold text-body">
+          <i class="bi bi-file-earmark-pdf me-2 text-danger"></i>${nombre || 'Sin título'}
         </td>
         <td class="align-middle text-center">
-          <span class="badge ${badgeClass} rounded-pill px-3">${estado}</span>
+          <span class="badge ${badge} rounded-pill px-3">${estado || 'Pendiente'}</span>
         </td>
-        <td class="text-muted small">${fecha}</td>
+        <td class="text-muted small align-middle">${fecha || '-'}</td>
+        <td class="align-middle text-center">
+          <button class="btn btn-sm btn-outline-primary shadow-sm" onclick="abrirDocumento('${idRaiz}')">
+            <i class="bi bi-eye"></i> Ver Detalles
+          </button>
+        </td>
       </tr>`;
   }).join("");
 }
@@ -163,15 +167,14 @@ function ejecutarSubida() {
 
 /**
  * Controla la visualización del estado de carga dentro de la tabla.
- * @param {HTMLElement} tbody - El cuerpo de la tabla.
- * @param {boolean} show - Determina si se muestra u oculta el spinner.
  */
 function mostrarLoadingTabla(tbody, show) {
   tbody.dataset.cargando = show ? "true" : "false";
   if (show) {
+    // CORREGIDO: Ajustado a un colspan de 4 columnas
     tbody.innerHTML = `
       <tr>
-        <td colspan="3" class="text-center text-muted py-4">
+        <td colspan="4" class="text-center text-muted py-4">
           <div class="spinner-border spinner-border-sm text-primary me-2"></div>
           Sincronizando...
         </td>
@@ -181,9 +184,6 @@ function mostrarLoadingTabla(tbody, show) {
 
 /**
  * Renderiza un mensaje de alerta en un contenedor específico.
- * @param {HTMLElement} contenedor - El elemento donde se insertará la alerta.
- * @param {string} tipo - Tipo de alerta Bootstrap (success, danger, warning, info).
- * @param {string} texto - Contenido del mensaje.
  */
 function mostrarAlerta(contenedor, tipo, texto) {
   if (contenedor) {
@@ -193,9 +193,6 @@ function mostrarAlerta(contenedor, tipo, texto) {
 
 /**
  * Alterna el estado de los botones y mensajes durante el proceso de subida.
- * @param {HTMLElement} btn - Botón de acción a bloquear/desbloquear.
- * @param {HTMLElement} mensaje - Contenedor de feedback.
- * @param {boolean} isProcessing - Estado actual del proceso.
  */
 function toggleSubidaUI(btn, mensaje, isProcessing) {
   if (btn) btn.disabled = isProcessing;
@@ -206,16 +203,18 @@ function toggleSubidaUI(btn, mensaje, isProcessing) {
 
 /**
  * Limpia el formulario y oculta el modal tras una subida exitosa.
- * @param {HTMLElement} input - El input de tipo archivo.
- * @param {HTMLElement} btn - El botón de confirmación.
  */
 function limpiarYRefrescarSubida(input, btn) {
   setTimeout(() => {
-    input.value = "";
+    if (input) input.value = "";
     if (btn) btn.disabled = false;
+    
     const modalEl = document.getElementById("modalSubir");
-    const instance = bootstrap.Modal.getInstance(modalEl);
-    if (instance) instance.hide();
+    if (modalEl) {
+      const instance = bootstrap.Modal.getInstance(modalEl);
+      if (instance) instance.hide();
+    }
+    
     cargarTablaDocumentos(); 
   }, 1500);
 }

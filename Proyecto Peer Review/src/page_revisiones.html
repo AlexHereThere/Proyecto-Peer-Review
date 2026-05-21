@@ -1,0 +1,66 @@
+<div class="container mt-4">
+
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0 fw-bold text-body">
+      <i class="bi bi-clipboard-check-fill text-primary me-2"></i>Revisiones Asignadas
+    </h4>
+    <button class="btn btn-sm btn-outline-secondary shadow-sm d-flex align-items-center" onclick="cargarTablaRevisiones()">
+      <i class="bi bi-arrow-clockwise me-1"></i> Actualizar
+    </button>
+  </div>
+
+  <div class="card mb-4 border-0 shadow-sm bg-body-tertiary">
+    <div class="card-body py-3">
+      <div class="d-flex gap-2">
+        <div class="input-group shadow-sm-inset">
+          <span class="input-group-text bg-body"><i class="bi bi-search text-muted"></i></span>
+          <input
+            type="search"
+            id="buscadorRev"
+            class="form-control"
+            placeholder="Escribe para buscar..."
+            oninput="filtrarRevisiones()"
+          >
+        </div>
+        <div class="dropdown">
+          <button class="btn btn-primary dropdown-toggle shadow-sm d-flex align-items-center" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="bi bi-filter-left me-1"></i> Filtrar por: <span id="criterioActualRev" class="fw-bold ms-1">Nombre</span>
+          </button>
+          <ul class="dropdown-menu dropdown-menu-end shadow border-0">
+            <li>
+              <a class="dropdown-item d-flex align-items-center" href="#" onclick="setBuscarPorRev('Nombre'); return false;">
+                <i class="bi bi-file-earmark-text me-2"></i> Nombre del Documento
+              </a>
+            </li>
+            <li>
+              <a class="dropdown-item d-flex align-items-center" href="#" onclick="setBuscarPorRev('Autor'); return false;">
+                <i class="bi bi-person me-2"></i> Email Autor
+              </a>
+            </li>
+            <li>
+              <a class="dropdown-item d-flex align-items-center" href="#" onclick="setBuscarPorRev('Estado'); return false;">
+                <i class="bi bi-tags me-2"></i> Estado de Evaluación
+              </a>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="table-responsive shadow-sm rounded">
+    <table class="table table-hover table-bordered mb-0">
+      <thead class="table-dark">
+        <tr>
+          <th style="width: 30%;" class="align-middle">Nombre de Documento</th>
+          <th style="width: 20%;" class="align-middle">Autor</th>
+          <th style="width: 15%;" class="text-center align-middle">Estado</th>
+          <th style="width: 15%;" class="align-middle">Fecha Asignación</th>
+          <th style="width: 20%;" class="text-center align-middle">Acciones Disponibles</th>
+        </tr>
+      </thead>
+      <tbody id="tablaRevisiones">
+        </tbody>
+    </table>
+  </div>
+</div>

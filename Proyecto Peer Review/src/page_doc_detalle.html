@@ -1,0 +1,130 @@
+<div class="container mt-4">
+  
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 id="tituloProyecto" class="mb-0 fw-bold text-body">
+      <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>Cargando documento...
+    </h4>
+    <button class="btn btn-sm btn-success shadow-sm d-flex align-items-center" data-bs-toggle="modal" data-bs-target="#modalNuevaVersion">
+      <i class="bi bi-file-earmark-plus me-1"></i> Subir Nueva Versión
+    </button>
+  </div>
+
+  <div class="card shadow-sm border-0 bg-body">
+    <div class="card-header bg-body-tertiary border-bottom-0 pt-3">
+      <ul class="nav nav-tabs card-header-tabs border-bottom-0" id="tabsVersiones" role="tablist"></ul>
+    </div>
+
+    <div class="card-body">
+      <div class="row g-2 mb-4">
+        <div class="col-6">
+          <button class="btn btn-sm btn-outline-danger w-100 shadow-sm d-flex align-items-center justify-content-center" onclick="eliminarVersion()">
+            <i class="bi bi-trash me-1"></i> Eliminar Versión
+          </button>
+        </div>
+        <div class="col-6">
+          <button class="btn btn-sm btn-outline-primary w-100 shadow-sm d-flex align-items-center justify-content-center" onclick="abrirVersion()">
+            <i class="bi bi-box-arrow-up-right me-1"></i> Abrir en Drive
+          </button>
+        </div>
+      </div>
+
+      <h5 class="card-title h6 fw-bold mb-2 text-secondary text-uppercase tracking-wider" style="font-size: 0.75rem; letter-spacing: 0.5px;">
+        <i class="bi bi-eye me-1"></i> Vista Previa
+      </h5>
+      <div id="previewPDF" class="border rounded mb-4 bg-body-tertiary d-flex align-items-center justify-content-center border-dashed" style="min-height: 250px;">
+        <div class="text-center text-muted py-4">
+          <div class="spinner-border text-primary mb-2" role="status"></div>
+          <p class="mb-0 fst-italic small">Generando renderizado del documento...</p>
+        </div>
+      </div>
+
+      <h5 class="card-title h6 fw-bold mb-2 text-secondary text-uppercase tracking-wider" style="font-size: 0.75rem; letter-spacing: 0.5px;">
+        <i class="bi bi-journal-check me-1"></i> Revisiones de esta Versión
+      </h5>
+      <div class="table-responsive shadow-sm rounded">
+        <table class="table table-hover table-bordered mb-0 align-middle">
+          <thead class="table-dark">
+            <tr>
+              <th style="width: 15%;" class="align-middle">Revisión</th>
+              <th style="width: 30%;" class="align-middle">Email Dictaminador / Rol</th>
+              <th style="width: 15%;" class="text-center align-middle">Estado</th>
+              <th style="width: 20%;" class="align-middle">Fecha Evaluación</th>
+              <th style="width: 20%;" class="text-center align-middle">Acciones Disponibles</th>
+            </tr>
+          </thead>
+          <tbody id="tablaRevisiones">
+            <tr>
+              <td colspan="5" class="text-center text-muted py-4">
+                <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+                Sincronizando flujo de arbitraje...
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="modalConfirmarEliminar" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header bg-danger text-white border-bottom-0">
+        <h5 class="modal-title fw-bold">
+          <i class="bi bi-exclamation-triangle-fill me-2"></i>Confirmar Eliminación
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p id="textoConfirmacionEliminar" class="mb-0 text-body">¿Estás seguro de que deseas eliminar esta versión? Esta acción no se puede deshacer.</p>
+        <div id="statusEliminar" class="d-none mt-2">
+          <div class="d-flex align-items-center text-danger small fw-bold">
+            <div class="spinner-border spinner-border-sm me-2"></div>
+            <span>Eliminando registros de versión...</span>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer bg-body-tertiary border-top-0 py-2">
+        <button type="button" class="btn btn-secondary shadow-sm" data-bs-dismiss="modal" id="btnCerrarModalEliminar">Cancelar</button>
+        <button type="button" id="btnConfirmarEliminarDoc" class="btn btn-danger shadow-sm">Eliminar Definitivamente</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="modalNuevaVersion" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header bg-success text-white border-bottom-0">
+        <h5 class="modal-title fw-bold">
+          <i class="bi bi-cloud-arrow-up-fill me-2"></i>Subir Nueva Versión
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-2">
+          <p class="text-muted small mb-3">Se indexará una versión consecutiva al historial cronológico del documento actual.</p>
+          <label class="form-label text-muted small fw-medium mb-1">Selecciona el archivo PDF actualizado:</label>
+          <div class="input-group shadow-sm">
+            <span class="input-group-text bg-body text-muted"><i class="bi bi-filetype-pdf"></i></span>
+            <input type="file" id="fileInputNuevaVersion" class="form-control" accept="application/pdf">
+          </div>
+        </div>
+        <div id="statusSubidaVersion" class="d-none mt-3">
+          <div class="d-flex align-items-center text-success small fw-bold">
+            <div class="spinner-border spinner-border-sm me-2"></div>
+            <span>Subiendo archivo al servidor institucional...</span>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer bg-body-tertiary border-top-0 py-2">
+        <button type="button" class="btn btn-secondary shadow-sm" data-bs-dismiss="modal" id="btnCerrarModalVersion">Cancelar</button>
+        <button type="button" id="btnConfirmarSubidaVersion" class="btn btn-success shadow-sm fw-bold" onclick="procesarNuevaVersion()">Subir Versión</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .border-dashed { border-style: dashed !important; border-width: 1.5px !important; }
+</style>

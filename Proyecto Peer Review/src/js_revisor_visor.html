@@ -1,0 +1,351 @@
+<script src="https://documentservices.adobe.com/view-sdk/viewer.js"></script>
+
+<script>
+/**
+ * js_revisor_visor.html
+ * Versión optimizada con políticas estrictas de anonimato y consistencia relacional.
+ */
+
+const ADOBE_CONFIG = {
+  CLIENT_ID: "dd82eb0fb3bd4cb5ad7a75d81d99c445",
+  DIV_ID: "adobe-dc-view-revisor"
+};
+
+let estadoRevision = null;
+let archivoActual = null;
+
+const AdobeInstancias = {
+  viewUI: null,
+  filePromise: null,
+  viewerInstance: null
+};
+
+// Estados globales de sincronización asíncrona
+window.GUARDANDO_COMENTARIOS = false;
+window.ULTIMO_GUARDADO = null;
+
+/**
+ * Espera el contenedor del DOM e inicializa el entorno de Adobe.
+ */
+async function cargarRevVisor() {
+  try {
+    await esperarElemento(ADOBE_CONFIG.DIV_ID);
+
+    if (window.AdobeDC) {
+      iniciarFlujoRevisorAdobe();
+    } else {
+      document.addEventListener("adobe_dc_view_sdk.ready", iniciarFlujoRevisorAdobe);
+    }
+  } catch (error) {
+    console.error("Error al inicializar contenedor Adobe:", error);
+  }
+}
+
+/**
+ * Orquesta las llamadas al servidor y configura el perfil de privacidad del Revisor.
+ */
+async function iniciarFlujoRevisorAdobe() {
+  const idArchivoR = window.ID_REVISION_ACTUAL;
+
+  if (!idArchivoR) {
+    console.error("No se encontró ID de revisión.");
+    return;
+  }
+
+  try {
+    // CORREGIDO: Ya no solicitamos 'sacarGoogleInfoUsuario' para resguardar el anonimato.
+    // Consultamos únicamente los datos del PDF y el estado transaccional.
+    const [fileObj, estado] = await Promise.all([
+      runServer("getPDFData", [idArchivoR]),
+      runServer("obtenerEstadoRevision", [idArchivoR])
+    ]);
+
+    archivoActual = fileObj;
+    estadoRevision = estado; // Espera: 'Asignado', 'En Revisión', 'A Corregir' o 'Finalizado'
+
+    actualizarBadgeEstado();
+
+    // Si la evaluación ya concluyó, ocultamos los botones de edición de la UI
+    if (estadoRevision === "Finalizado" || estadoRevision === "Aprobado" || estadoRevision === "A Corregir") {
+      const btn = document.getElementById("btnFinalizar");
+      if (btn) btn.style.display = "none";
+    }
+
+    // PROTECCIÓN DE IDENTIDAD: Forzamos la firma genérica "Revisor" en lugar del nombre real de Google
+    initAdobeViewer(fileObj, "Revisor");
+    
+    // Cambia el estado en la base de datos de 'Asignado' a 'En Revisión' automáticamente al abrir
+    runServer("iniciarRevision", [idArchivoR]);
+
+  } catch (e) {
+    console.error("Error crítico flujo Adobe:", e);
+    document.getElementById(ADOBE_CONFIG.DIV_ID).innerHTML = `
+      <div class="alert alert-danger m-3">
+        <i class="bi bi-exclamation-octagon-fill me-2"></i> Error al recuperar el archivo PDF desde Google Drive.
+      </div>`;
+  }
+}
+
+/**
+ * Actualiza dinámicamente el componente visual del Badge de Bootstrap.
+ */
+function actualizarBadgeEstado() {
+  const badge = document.getElementById("estadoBadge");
+  if (!badge) return;
+
+  badge.textContent = estadoRevision;
+  badge.classList.remove("bg-secondary", "bg-warning", "bg-success", "bg-danger");
+
+  if (estadoRevision === "Asignado") {
+    badge.classList.add("bg-secondary");
+  } else if (estadoRevision === "En Revisión" || estadoRevision === "En revisión") {
+    badge.classList.add("bg-warning", "text-dark");
+  } else if (estadoRevision === "Finalizado" || estadoRevision === "Aprobado") {
+    badge.classList.add("bg-success");
+  } else if (estadoRevision === "A Corregir") {
+    badge.classList.add("bg-danger");
+  }
+}
+
+/**
+ * Inicializa el lienzo interactivo del SDK de Adobe.
+ */
+function initAdobeViewer(fileObj, username) {
+  const container = document.getElementById(ADOBE_CONFIG.DIV_ID);
+  if (!container) return;
+  container.innerHTML = "";
+
+  AdobeInstancias.viewUI = new AdobeDC.View({
+    clientId: ADOBE_CONFIG.CLIENT_ID,
+    divId: ADOBE_CONFIG.DIV_ID
+  });
+
+  const esModoLectura = estadoRevision === "Finalizado" || estadoRevision === "Aprobado" || estadoRevision === "A Corregir";
+
+  // CORREGIDO: Forzar pseudónimo en el perfil de registro de Adobe (Metadatos internos del PDF)
+  AdobeInstancias.viewUI.registerCallback(
+    AdobeDC.View.Enum.CallbackType.GET_USER_PROFILE_API,
+    () => Promise.resolve({
+      code: AdobeDC.View.Enum.ApiResponseCode.SUCCESS,
+      data: {
+        userProfile: {
+          id: "revisor_anonimo",
+          name: username // Evaluará como "Revisor" siempre
+        }
+      }
+    })
+  );
+
+  // SAVE_API OFICIAL CON AUTO-GUARDADO ASÍNCRONO
+  AdobeInstancias.viewUI.registerCallback(
+    AdobeDC.View.Enum.CallbackType.SAVE_API,
+    async function(metaData, content) {
+      try {
+        if (esModoLectura) {
+          return Promise.reject({ code: AdobeDC.View.Enum.ApiResponseCode.FAIL });
+        }
+
+        window.GUARDANDO_COMENTARIOS = true;
+        const base64 = await uint8ToBase64(new Uint8Array(content));
+        
+        // Persiste los cambios directamente sobre el archivo en Drive
+        await runServer("guardarComentarios", [base64, archivoActual.fileId]);
+
+        window.ULTIMO_GUARDADO = Date.now();
+        return Promise.resolve({
+          code: AdobeDC.View.Enum.ApiResponseCode.SUCCESS,
+          data: { metaData: metaData }
+        });
+
+      } catch (e) {
+        console.error("Error crítico en SAVE_API de Adobe:", e);
+        return Promise.reject({ code: AdobeDC.View.Enum.ApiResponseCode.FAIL });
+      } finally {
+        window.GUARDANDO_COMENTARIOS = false;
+      }
+    },
+    {
+      autoSaveFrequency: 5000,
+      enableFocusPolling: true,
+      showSaveButton: true
+    }
+  );
+
+  const pdfBuffer = _internalBase64ToBinary(fileObj.bytes);
+
+  // Instanciación del visor con bloqueos de seguridad de descarga y clonación
+  AdobeInstancias.filePromise = AdobeInstancias.viewUI.previewFile(
+    {
+      content: { promise: Promise.resolve(pdfBuffer) },
+      metaData: {
+        fileName: fileObj.fileName || "Evaluacion_Arbitraje.pdf",
+        id: fileObj.fileId
+      }
+    },
+    {
+      embedMode: "FULL_WINDOW",
+      theme: (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? "DARK_GRAY" : "LIGHT_GRAY",
+      showAnnotationTools: true, // Si está finalizado, no mostramos barra de herramientas
+      enableAnnotationAPIs: true,
+      includePDFAnnotations: true,
+      showDownloadPDF: false,              // Seguridad: Impide al revisor quedarse copias locales sin marcas
+      showPrintPDF: false
+    }
+  );
+
+  // Listener reactivo para reconfigurar el botón de acción según el conteo de notas
+  AdobeInstancias.filePromise.then(
+    async (adobeViewer) => {
+      AdobeInstancias.viewerInstance = adobeViewer;
+      const annotManager = await adobeViewer.getAnnotationManager();
+
+      async function actualizarBotonFinalizar() {
+        try {
+          const annotations = await annotManager.getAnnotations();
+          const btn = document.getElementById("btnFinalizar");
+          if (!btn) return;
+
+          if (esModoLectura) {
+            btn.style.display = "none";
+            return;
+          }
+
+          window.TOTAL_COMENTARIOS_ACTUALES = annotations ? annotations.length : 0;
+
+          if (window.TOTAL_COMENTARIOS_ACTUALES > 0) {
+            btn.innerHTML = `
+              <i class="bi bi-exclamation-triangle-fill me-1"></i>
+              Enviar Dictamen para Corrección (<span class="badge bg-danger">${window.TOTAL_COMENTARIOS_ACTUALES}</span>)
+            `;
+            btn.className = "btn btn-warning text-dark fw-bold shadow-sm";
+            window.ACCION_FINALIZAR = "A Corregir";
+          } else {
+            btn.innerHTML = `
+              <i class="bi bi-check-circle-fill me-1"></i>
+              Aprobar Versión de Forma Definitiva
+            `;
+            btn.className = "btn btn-success fw-bold shadow-sm";
+            // CORREGIDO: Alineado a la estructura de la base de datos relacional ('Finalizado')
+            window.ACCION_FINALIZAR = "Finalizado"; 
+          }
+        } catch (err) {
+          console.error("Error actualizando botón transaccional:", err);
+        }
+      }
+
+      await actualizarBotonFinalizar();
+
+      // Registro del observador en tiempo real del canvas
+      annotManager.registerEventListener(
+        () => { actualizarBotonFinalizar(); },
+        { listenOn: ["ANNOTATION_ADDED", "ANNOTATION_DELETED", "ANNOTATION_UPDATED"] }
+      );
+    }
+  );
+}
+
+/**
+ * Convierte arreglos de bytes binarios a cadenas Base64 compatibles con Apps Script.
+ */
+function uint8ToBase64(uint8) {
+  return new Promise((resolve) => {
+    const blob = new Blob([uint8], { type: 'application/pdf' });
+    const reader = new FileReader();
+    reader.onload = (e) => { resolve(e.target.result.split(',')[1]); };
+    reader.readAsDataURL(blob);
+  });
+}
+
+/**
+ * Valida los bloqueos asíncronos pendientes y empuja el cambio de estado definitivo.
+ */
+async function finalizarRevisionUI() {
+  // Validación de consistencia metodológica
+  if (window.ACCION_FINALIZAR === "A Corregir" && (!window.TOTAL_COMENTARIOS_ACTUALES || window.TOTAL_COMENTARIOS_ACTUALES === 0)) {
+    await mostrarModalFinalizar(
+      "Acción Requerida",
+      `No puedes finalizar la revisión con el estado <b>"A Corregir"</b> si no has dibujado ninguna observación o comentario dentro del PDF.`,
+      false
+    );
+    return;
+  }
+
+  // Confirmación formal mediante el modal modalizado
+  const confirmado = await mostrarModalFinalizar(
+    "Confirmar Dictamen Definitivo",
+    `¿Estás seguro de que deseas dar por terminada esta evaluación? Una vez enviada, tus observaciones se bloquearán y serán notificadas al Autor de forma anónima.`,
+    true
+  );
+  if (!confirmado) return;
+
+  try {
+    // Bloqueo preventivo: Si el auto-save de 5 segundos de Adobe está activo, forzamos espera
+    if (window.GUARDANDO_COMENTARIOS) {
+      console.log("Sincronizando últimas notas con Drive...");
+      await new Promise(resolve => {
+        const interval = setInterval(() => {
+          if (!window.GUARDANDO_COMENTARIOS) {
+            clearInterval(interval);
+            resolve();
+          }
+        }, 300);
+      });
+    }
+
+    // Cierre transaccional en el servidor
+    await runServer("finalizarRevision", [
+      window.ID_REVISION_ACTUAL,
+      window.ACCION_FINALIZAR
+    ]);
+
+    await mostrarModalFinalizar(
+      "Evaluación Registrada",
+      `El dictamen ha sido guardado y procesado con éxito.`
+    );
+
+    cargarVista("page_revisiones");
+
+  } catch (e) {
+    console.error("Error al ejecutar finalizarRevision:", e);
+    await mostrarModalFinalizar(
+      "Falla de Sincronización",
+      `Ocurrió un error en el servidor al intentar cerrar la revisión: ${e.message}`,
+      false
+    );
+  }
+}
+
+/**
+ * Reutiliza el componente modal de Bootstrap para retornos limpios basados en promesas.
+ */
+function mostrarModalFinalizar(titulo, mensaje, esConfirmacion = false) {
+  return new Promise((resolve) => {
+    const modalEl = document.getElementById('customModal');
+    if (!modalEl) return resolve(false);
+    
+    const modal = new bootstrap.Modal(modalEl);
+
+    document.getElementById('modalTitle').textContent = titulo;
+    document.getElementById('modalBody').innerHTML = mensaje;
+
+    const btnPrincipal = document.getElementById('btnModalPrincipal');
+    const btnSecundario = document.getElementById('btnModalSecundario');
+
+    btnSecundario.style.display = esConfirmacion ? 'inline-block' : 'none';
+    btnPrincipal.textContent = esConfirmacion ? 'Confirmar Envió' : 'Entendido';
+
+    btnPrincipal.onclick = () => {
+      modal.hide();
+      resolve(true);
+    };
+
+    modalEl.addEventListener(
+      'hidden.bs.modal',
+      () => { resolve(false); },
+      { once: true }
+    );
+
+    modal.show();
+  });
+}
+</script>

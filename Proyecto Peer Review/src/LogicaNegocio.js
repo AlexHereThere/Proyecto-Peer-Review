@@ -5,12 +5,11 @@
 /**
  * Configura la infraestructura inicial del sistema: crea la hoja de cálculo de base de datos
  * y define el esquema de tablas si no existen.
- * * @returns {string} El ID de la hoja de cálculo (Spreadsheet) del sistema.
+ * @returns {string} El ID de la hoja de cálculo (Spreadsheet) del sistema.
  */
 function inicializarSistema() {
   const props = PropertiesService.getScriptProperties();
   let sheetId = props.getProperty('SHEET_ID');
-  let padreId = props.getProperty('PROJECT_FOLDER_ID');
 
   if (sheetId) {
     try {
@@ -21,12 +20,22 @@ function inicializarSistema() {
     }
   }
 
+  let padreId = props.getProperty('PROJECT_FOLDER_ID');
+
+  if (!padreId) {
+    throw new Error(
+    "PROJECT_FOLDER_ID no configurado. " +
+    "Configúralo manualmente en Script Properties."
+    );
+  }
+
   const carpetaPadre = DriveApp.getFolderById(padreId);
+
   const carpetaDB = obtenerOCrearCarpeta("Base de Datos", carpetaPadre);
-  
+
   let ss;
   const iterSheet = carpetaDB.getFilesByName("Datos del Sistema");
-  
+
   if (iterSheet.hasNext()) {
     ss = SpreadsheetApp.open(iterSheet.next());
   } else {
@@ -34,24 +43,29 @@ function inicializarSistema() {
     DriveApp.getFileById(ss.getId()).moveTo(carpetaDB);
   }
 
-  // ESQUEMA RELACIONAL: Definición de tablas y sus estructuras
+  // ESQUEMA RELACIONAL (Alineado para mayor legibilidad)
   const esquema = [
-    { nombre: "Usuarios", cabeceras: ["Email_Usuario", "Nombre_Usuario", "Roles", "ID_G_Carpeta", "Fecha_Registro"] },
+    { nombre: "Usuarios",   cabeceras: ["Email_Usuario", "Nombre_Usuario", "Roles", "ID_G_Carpeta", "Fecha_Registro"] },
     { nombre: "Documentos", cabeceras: ["Fecha", "Nombre_Archivo", "ID_Documento_Raiz", "ID_G_Trabajo", "ID_G_Versiones", "ID_G_Revisiones", "Estado", "Email_Autor"] },
-    { nombre: "Versiones", cabeceras: ["ID_Documento_Raiz", "ID_Archivo_V", "Numero_Version", "Nombre_Archivo_V", "Fecha_Subida"] },
-    { nombre: "Revisiones", cabeceras: ["ID_Archivo_V", "ID_Archivo_R", "Numero_Revision", "Email_Revisor", "Estado", "Fecha"] },
-    { nombre: "Actividad", cabeceras: ["ID_Actividad","Email_Usuario","Titulo_Doc","Tipo_Evento","Detalle_Display","Clase_CSS","Fecha","Accion_Enlace"]}
+    { nombre: "Versiones",  cabeceras: ["ID_Documento_Raiz", "ID_Archivo_V", "Numero_Version", "Nombre_Archivo_V", "Fecha_Subida"] },
+    { nombre: "Revisiones", cabeceras: ["ID_Archivo_V", "ID_Archivo_R", "Numero_Revision", "Email_Revisor", "Estado", "Fecha", "Tipo_Revision"] },
+    { nombre: "Actividad",  cabeceras: ["ID_Actividad", "Email_Usuario", "Titulo_Doc", "Tipo_Evento", "Detalle_Display", "Clase_CSS", "Fecha", "Accion_Enlace"] }
   ];
-
   esquema.forEach(tabla => asegurarHoja(ss, tabla.nombre, tabla.cabeceras));
 
+  const hojaUsuarios = ss.getSheetByName("Usuarios");
+  if (hojaUsuarios.getLastRow() <= 1) {
+    hojaUsuarios.appendRow(["omar.leal@uabc.edu.mx", "Omar Leal", "Admin", "", new Date()]);
+  }
+
   props.setProperty('SHEET_ID', ss.getId());
+  console.log("Sistema listo. Spreadsheet ID: " + ss.getId());
   return ss.getId();
 }
 
 /**
  * Garantiza la existencia de una hoja y sus cabeceras. Si no existe, la crea.
- * * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} ss - Instancia de la hoja de cálculo.
+ * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} ss - Instancia de la hoja de cálculo.
  * @param {string} nombre - Nombre de la hoja deseada.
  * @param {Array<string>} cabeceras - Lista de títulos para la primera fila.
  * @returns {GoogleAppsScript.Spreadsheet.Sheet} La hoja asegurada.
@@ -92,7 +106,7 @@ function eliminarRegistrosRelacionados(idRaiz) {
       }
     }
 
-    // Limpiar tabla 'Versiones'
+  // Limpiar tabla 'Versiones'
     for (let i = dataVer.length - 1; i >= 1; i--) {
       if (dataVer[i][0] === idRaiz) {
         sheetVer.deleteRow(i + 1);

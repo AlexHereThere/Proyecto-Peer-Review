@@ -1,0 +1,17 @@
+{
+  "name": "proyecto-peer-review",
+  "version": "1.0.0",
+  "description": "",
+  "main": "Actividad.js",
+  "scripts": {
+    "test:grabar": "npx playwright codegen --load-storage=playwright/.auth/user.json https://script.google.com/macros/s/AKfycbzx28m2JWcpYwCaHAwkDFqAdZdG8ybEefOoQ6eBmSaD4IW6Ojo7EDNuYb9h61tN-oIW3g/exec"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@playwright/test": "^1.59.1",
+    "@types/node": "^25.6.2"
+  }
+}

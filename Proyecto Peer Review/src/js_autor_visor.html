@@ -1,13 +1,13 @@
 <script>
 /**
  * @fileoverview Orquestador del visor de Adobe para la vista del Autor.
+ * Configurado exclusivamente para la consulta y lectura estricta de observaciones.
  */
 
 /**
  * Espera la carga del elemento DOM y prepara la inicialización del SDK de Adobe.
  * @async
  * @function cargarAutVisor
- * @returns {Promise<void>}
  */
 async function cargarAutVisor() {
   try {
@@ -23,75 +23,78 @@ async function cargarAutVisor() {
 }
 
 /**
- * Coordina la obtención de datos del servidor e inicia la carga del PDF.
+ * Coordina la obtención del PDF dictaminado desde el servidor e inicia el visor.
  * @async
  * @function iniciarFlujoAutorAdobe
- * @returns {Promise<void>}
  */
 async function iniciarFlujoAutorAdobe() {
   const idArchivo = window.ID_REVISION_ACTUAL;
   if (!idArchivo) {
-    console.error("No hay ID de archivo disponible");
+    console.error("No hay ID de archivo de revisión disponible.");
     return;
   }
   try {
-    const [user, fileObj] = await Promise.all([
-      runServer("sacarGoogleInfoUsuario"),
-      runServer("getPDFData", [idArchivo])
-    ]);
-    initAdobeViewerAutor(fileObj, user.name || "Autor");
+    //  Eliminamos Promise.all y la consulta de datos del usuario de Google.
+    // Solo traemos el PDF binario correspondiente al dictamen.
+    const fileObj = await runServer("getPDFData", [idArchivo]);
+    
+    // Forzamos el nombre de perfil "Autor" garantizando neutralidad absoluta en el visor.
+    initAdobeViewerAutor(fileObj, "Autor");
   } catch (e) {
-    console.error("Error cargando observaciones:", e);
+    console.error("Error cargando observaciones en el servidor:", e);
   }
 }
 
 /**
- * Configura y renderiza el visor de Adobe DC View SDK.
+ * Configura y renderiza el visor de Adobe en modo estricto de Solo Lectura.
  * @function initAdobeViewerAutor
  * @param {Object} fileObj - Objeto con los datos del archivo (bytes, nombre, id).
- * @param {string} fileObj.bytes - Contenido del archivo en formato base64.
- * @param {string} fileObj.fileName - Nombre del archivo PDF.
- * @param {string} fileObj.fileId - Identificador único del archivo.
- * @param {string} username - Nombre del usuario para la sesión de anotaciones.
+ * @param {string} username - Rol del usuario para la sesión visual ("Autor").
  */
 function initAdobeViewerAutor(fileObj, username) {
   const divId = "adobe-dc-view-autor";
   const container = document.getElementById(divId);
   if (!container) return;
   container.innerHTML = "";
+
   const adobeDCView = new AdobeDC.View({
     clientId: ADOBE_CONFIG.CLIENT_ID,
     divId: divId
   });
+
   const pdfBuffer = _internalBase64ToBinary(fileObj.bytes);
   const previewPromise = adobeDCView.previewFile({
     content: { promise: Promise.resolve(pdfBuffer) },
     metaData: {
-      fileName: fileObj.fileName || "Documento.pdf",
+      fileName: fileObj.fileName || "Dictamen_Observaciones.pdf",
       id: fileObj.fileId
     }
   }, {
     embedMode: "FULL_WINDOW",
     defaultViewMode: "FIT_PAGE",
-    showAnnotationTools: true,
+    showAnnotationTools: true,     
     enableAnnotationAPIs: true,
-    includePDFAnnotations: true
+    includePDFAnnotations: true      // Renderiza los comentarios que guardó el Revisor
   });
 
-  // configurar permisos granulares
+  // Aplicación inmediata del bloqueo de modificaciones
   previewPromise.then(adobeViewer => {
     adobeViewer.getAnnotationManager().then(annotManager => {
-      if (estadoRevision === "Finalizado") {
-        // Configuramos los permisos para bloquear la creación
-        annotManager.setConfig({
-          annotationPermissionsConfig: {
-            canAddAnnotation: false,    // Esto quita el botón "Save" de nuevos comentarios
-            canDeleteAnnotation: false, // No pueden borrar existentes
-            canUpdateAnnotation: false, // No pueden editar existentes
-            canReplyAnnotation: false   // No pueden responder
-          }
-        });
-      }
+      // SOLUCIÓN: Bloqueo incondicional. El autor solo entra a leer.
+      annotManager.setConfig({
+        annotationPermissionsConfig: {
+          profile: {
+            user: {
+              id: "autor_lector",
+              name: username // "Autor"
+            }
+          },
+          canAddAnnotation: false,    // Desactiva creación de notas
+          canDeleteAnnotation: false, // Bloquea borrado de notas ajenas
+          canUpdateAnnotation: false, // Bloquea edición de contenido
+          canReplyAnnotation: false   // Desactiva respuestas en hilos
+        }
+      });
     });
   });
 }

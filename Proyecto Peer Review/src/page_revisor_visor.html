@@ -1,0 +1,56 @@
+<div class="d-flex justify-content-between align-items-center mb-3 mt-4 px-1">
+  <div class="d-flex align-items-center gap-2">
+    <h5 class="mb-0 fw-bold text-dark">
+      <i class="bi bi-layer-forward text-primary me-2"></i>Espacio de Evaluación
+    </h5>
+    <span id="estadoBadge" class="badge rounded-pill px-3 shadow-sm">Consultando...</span>
+  </div>
+
+  <div class="d-flex align-items-center gap-2">
+    <button id="btnFinalizar" class="btn btn-success btn-sm fw-bold shadow-sm" onclick="finalizarRevisionUI()">
+      <i class="bi bi-send-check-fill me-1"></i> Finalizar revisión
+    </button>
+
+    <button class="btn btn-outline-secondary btn-sm d-flex align-items-center shadow-sm" onclick="cargarVista('page_revisiones')">
+      <i class="bi bi-arrow-left me-1"></i> Volver al Listado
+    </button>
+  </div>
+</div>
+
+<div class="container-fluid px-0">
+  <div id="adobe-dc-view-revisor"
+       class="shadow rounded border"
+       style="
+         height: 85vh;
+         width: 100%;
+         background-color: #f8f9fa;
+       ">
+    </div>
+</div>
+
+<div class="modal fade" id="customModal" tabindex="-1" aria-labelledby="modalTitle" aria-hidden="true" data-bs-backdrop="static">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      
+      <div class="modal-header bg-body-tertiary border-bottom-0">
+        <h5 class="modal-title fw-bold text-body-secondary" id="modalTitle">
+          <i class="bi bi-info-circle-fill text-primary me-2"></i>Notificación
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      
+      <div class="modal-body py-4 fs-6 text-body" id="modalBody">
+        </div>
+      
+      <div class="modal-footer bg-body-tertiary border-top-0 pt-0">
+        <button type="button" class="btn btn-sm btn-outline-secondary px-3 shadow-sm" id="btnModalSecundario" data-bs-dismiss="modal">
+          Cancelar
+        </button>
+        <button type="button" class="btn btn-sm btn-primary px-3 fw-semibold shadow-sm" id="btnModalPrincipal">
+          Aceptar
+        </button>
+      </div>
+
+    </div>
+  </div>
+</div>

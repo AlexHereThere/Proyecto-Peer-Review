@@ -1,0 +1,194 @@
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+/**
+ * js.html - Lógica de Navegación, Sesión y Permisos (Cliente)
+ */
+
+// --- CARGA E INICIALIZACIÓN INICIAL ---
+window.addEventListener("load", () => {
+  // 1. Cargar datos básicos del perfil de Google (Nombre, foto, email)
+  cargarUsuario();
+
+  // 2. Evaluar permisos en el servidor y configurar botones del Sidebar
+  actualizarPermisosYBotonesUI((res) => {
+    // Este callback solo se ejecuta una vez al encender la aplicación por primera vez
+    if (res.esAdmin) {
+      cargarVista("page_admin");
+    } else {
+      cargarVista("page_home");
+    }
+  });
+});
+
+/**
+ * Solicita al servidor los roles vigentes del usuario conectado y actualiza
+ * de manera reactiva la visibilidad de los botones en el Sidebar.
+ * @param {Function} callback - Función opcional a ejecutar tras la actualización.
+ */
+function actualizarPermisosYBotonesUI(callback) {
+  google.script.run
+    .withSuccessHandler(res => {
+      // Sincronizar los estados globales en el objeto window del cliente
+      window.esAdmin   = res.esAdmin;
+      window.esRevisor = res.esRevisor;
+      window.esAutor   = res.esAutor;
+
+      // Manipulación directa de los elementos del DOM en el Sidebar
+      const btnAdmin = document.getElementById("btnAdmin");
+      if (btnAdmin) btnAdmin.style.display = res.esAdmin ? "block" : "none";
+
+      const btnRevisiones = document.getElementById("btnRevisiones");
+      if (btnRevisiones) btnRevisiones.style.display = res.esRevisor ? "block" : "none";
+
+      const btnDocumentos = document.getElementById("btnDocumentos");
+      if (btnDocumentos) btnDocumentos.style.display = res.esAutor ? "block" : "none";
+      
+      // Si se proporcionó una función de retorno, ejecutarla pasándole la respuesta
+      if (typeof callback === "function") {
+        callback(res);
+      }
+    })
+    .withFailureHandler(err => console.error("Error al actualizar los permisos y botones de la interfaz:", err))
+    .inicializarUsuario();
+}
+
+/**
+ * Obtiene la información del perfil del usuario (Nombre, Foto de perfil y Email)
+ */
+function cargarUsuario() {
+  google.script.run
+    .withSuccessHandler(user => {
+      const nameEl  = document.getElementById("userName");
+      const photoEl = document.getElementById("userPhoto");
+      
+      if (nameEl)  nameEl.innerText = user.name;
+      if (photoEl) photoEl.src = user.photo;
+      
+      // Guardar el correo electrónico del usuario de manera global
+      window._emailActual = user.email;
+    })
+    .withFailureHandler(err => console.error("Error al obtener la información de perfil del usuario:", err))
+    .sacarGoogleInfoUsuario();
+}
+
+// --- SISTEMA DE ENRUTAMIENTO Y VISTAS ASÍNCRONAS ---
+
+/**
+ * Solicita al backend el fragmento HTML de la vista deseada y lo inyecta en el contenedor principal
+ * @param {String} nombre - Nombre del archivo de la vista (ej. 'page_admin', 'page_home')
+ */
+function cargarVista(nombre) {
+  google.script.run
+    .withSuccessHandler(html => {
+      const contenedor = document.getElementById("contenido");
+      if (contenedor) {
+        contenedor.innerHTML = html;
+        inicializarVista(nombre);
+      }
+    })
+    .withFailureHandler(err => console.error(`Error al cargar la vista dinámica [${nombre}]:`, err))
+    .getVista(nombre);
+}
+
+/**
+ * Enruta e invoca la función constructora correspondiente a la vista que se acaba de inyectar
+ * @param {String} nombre - Nombre de la vista activa
+ */
+function inicializarVista(nombre) {
+  console.log("Navegando a la vista:", nombre);
+
+  const routers = {
+    "page_home":          () => typeof cargarHome === "function" && cargarHome(),
+    "page_admin":         () => typeof cargarAdmin === "function" && cargarAdmin(),
+    "page_revisiones":    () => typeof cargarRevisiones === "function" && cargarRevisiones(),
+    "page_revisor_visor": () => typeof cargarRevVisor === "function" && cargarRevVisor(),
+    "page_documentos":    () => typeof cargarDocumentos === "function" && cargarDocumentos(),
+    "page_doc_detalle":   () => typeof cargarDetalle === "function" && cargarDetalle(),
+    "page_autor_visor":   () => typeof cargarAutVisor === "function" && cargarAutVisor(),
+    "page_cuenta":        () => typeof cargarDashboard === "function" && cargarDashboard()
+  };
+
+  if (routers[nombre]) {
+    routers[nombre]();
+  }
+}
+
+// --- UTILERÍAS COMPARTIDAS (MANEJO DE ARCHIVOS Y FLUJOS ASÍNCRONOS) ---
+
+/**
+ * Promesa que resuelve cuando un elemento del DOM específico aparece en la interfaz
+ * @param {String} id - ID del elemento HTML esperado
+ */
+function esperarElemento(id) {
+  return new Promise(resolve => {
+    const check = () => {
+      const el = document.getElementById(id);
+      el ? resolve(el) : requestAnimationFrame(check);
+    };
+    check();
+  });
+}
+
+/**
+ * Convierte un arreglo Uint8Array a una cadena codificada en Base64 de manera asíncrona
+ */
+window.uint8ToBase64 = (uint8Array) => {
+  return new Promise((resolve, reject) => {
+    const blob = new Blob([uint8Array], { type: 'application/octet-stream' });
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+};
+
+/**
+ * Convierte un objeto de tipo File (Blob del navegador) a un Uint8Array legible por el servidor
+ */
+window.fileToUint8 = (file) => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(new Uint8Array(reader.result));
+    reader.onerror = reject;
+    reader.readAsArrayBuffer(file);
+  });
+};
+
+/**
+ * Decodifica una cadena Base64 internamente a un búfer binario
+ * @private
+ */
+function _internalBase64ToBinary(base64) {
+  const binaryString = window.atob(base64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes.buffer;
+}
+
+/**
+ * Wrapper basado en promesas para llamadas simplificadas al servidor, controlando tiempos de respuesta
+ * @param {String} funcName - Nombre de la función en Code.gs
+ * @param {Array} args - Argumentos a pasar a la función del servidor
+ */
+function runServer(funcName, args = []) {
+  return new Promise((resolve, reject) => {
+    const inicio = performance.now();
+    google.script.run
+      .withSuccessHandler((result) => {
+        const fin = performance.now();
+        console.log(`Tiempo de respuesta API [${funcName}]: ${(fin - inicio).toFixed(2)} ms`);
+        resolve(result);
+      })
+      .withFailureHandler((error) => {
+        const fin = performance.now();
+        console.error(`Error en API [${funcName}] tras ${(fin - inicio).toFixed(2)} ms:`, error);
+        reject(error);
+      })
+      [funcName](...args);
+  });
+}
+</script>

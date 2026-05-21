@@ -1,7 +1,9 @@
-<script>
+d<script>
 /**
- * js_doc_detalle.html - Gestión de Versiones y Revisiones
+ * js_doc_detalle.html - Gestión de Versiones y Revisiones (Vista del Autor)
  */
+
+// --- 1. VARIABLES GLOBALES ---
 
 /** @type {Array<Object>} Lista de versiones obtenidas del servidor */
 let versiones = [];
@@ -14,11 +16,10 @@ let versionesFolderId = null;
 /** @type {string|null} ID de la carpeta de Drive para revisiones */
 let revisionesFolderId = null;
 
-// --- 1. INICIALIZACIÓN ---
+// --- 2. INICIALIZACIÓN ---
 
 /**
  * Orquestador inicial que recupera el ID del documento activo y prepara la interfaz.
- * @function cargarDetalle
  */
 function cargarDetalle() {
   const idDocOriginal = window.ID_DOCUMENTO_ACTUAL;
@@ -36,7 +37,6 @@ function cargarDetalle() {
 
 /**
  * Realiza la llamada al servidor para obtener el objeto jerárquico del documento.
- * @function cargarDetalleDocumento
  */
 function cargarDetalleDocumento() {
   google.script.run
@@ -48,12 +48,10 @@ function cargarDetalleDocumento() {
     .obtenerDetalleDocumento(idDocumentoRaiz);
 }
 
-// --- 2. RENDERIZADO DE INTERFAZ (UI) ---
+// --- 3. RENDERIZADO DE INTERFAZ (UI) ---
 
 /**
  * Procesa los datos del servidor y distribuye la información en los componentes.
- * @function renderDetalle
- * @param {Object} data - Objeto con nombre, carpetas e historial de versiones.
  */
 function renderDetalle(data) {
   if (!data) {
@@ -74,7 +72,6 @@ function renderDetalle(data) {
 
 /**
  * Genera dinámicamente las pestañas para navegar entre las versiones del documento.
- * @function renderTabsVersiones
  */
 function renderTabsVersiones() {
   const cont = document.getElementById("tabsVersiones");
@@ -83,6 +80,7 @@ function renderTabsVersiones() {
     cont.innerHTML = '<li class="nav-item"><span class="nav-link disabled">Sin versiones</span></li>';
     return;
   }
+  // Mapear las pestañas ordenadas cronológicamente
   cont.innerHTML = versiones.map((ver, i) => `
     <li class="nav-item">
       <a class="nav-link ${i === 0 ? 'active' : ''}" href="#" onclick="seleccionarVersion(${i}); return false;">
@@ -94,48 +92,136 @@ function renderTabsVersiones() {
 }
 
 /**
+ * REPLICA LOCAL OPTIMIZADA: Evalúa las identidades visibles según la modalidad de arbitraje.
+ * CORREGIDO: Uso de .toLowerCase() y .trim() para evitar falsos negativos en la comparación del tipo.
+ * @param {string} tipo - Modalidad ("Doble Ciego", "Simple Ciego", "Abierta")
+ * @param {string} rolConsulta - Quién está consultando (En esta vista, siempre "Autor")
+ * @param {string} revisor - Nombre o correo del revisor original
+ * @returns {Object} Identidad procesada
+ */
+function obtenerIdentidadesVisiblesCliente(tipo, rolConsulta, revisor) {
+  const tipoLimpio = (tipo || "Doble Ciego").trim().toLowerCase();
+  const revisorOriginal = (revisor || "").trim();
+  const revisorMinuscula = revisorOriginal.toLowerCase();
+
+  // 1. Si la modalidad es Abierta, el autor SIEMPRE tiene permitido ver al revisor asignado
+  if (tipoLimpio === "abierta") {
+    if (!revisorOriginal || revisorMinuscula === "pendiente") {
+      return { revisor: "Pendiente" };
+    }
+    return { revisor: revisorOriginal }; 
+  }
+
+  // 2. Si es Ciego, protegemos la identidad sin importar lo que contenga la variable revisor
+  if (tipoLimpio === "simple ciego" || tipoLimpio === "doble ciego") {
+    if (!revisorOriginal || revisorMinuscula === "pendiente") {
+      return { revisor: "Pendiente" };
+    }
+    return { revisor: "Anónimo (Revisor)" };
+  }
+
+  // Respaldo de seguridad por defecto
+  return { revisor: "Anónimo (Revisor)" };
+}
+
+/**
  * Renderiza la tabla de revisiones asociada a la versión seleccionada.
- * @function renderRevisionesVersion
+ * Incluye un estado de carga intermedio y validación de vacíos estética.
  * @param {Array<Object>} revs - Lista de revisiones.
  */
 function renderRevisionesVersion(revs) {
   const tbody = document.getElementById("tablaRevisiones");
   if (!tbody) return;
+  
   if (!revs || revs.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">Sin revisiones en esta versión.</td></tr>';
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="5" class="text-center py-4 bg-body-tertiary rounded-bottom border-top-0">
+          <div class="py-2">
+            <i class="bi bi-file-earmark-lock2 text-body-secondary display-6 d-block mb-2"></i>
+            <span class="fw-semibold text-body">No se encontraron revisiones</span><br>
+            <small class="text-muted d-block mt-1">Aún no se han asignado dictaminadores para evaluar esta versión.</small>
+          </div>
+        </td>
+      </tr>`;
     return;
   }
-  tbody.innerHTML = revs.map(r => `
-    <tr>
-      <td class="fw-bold">R${r.numero}</td>
-      <td>${r.revisor || 'Pendiente'}</td>
-      <td>
-        <span class="badge ${r.estado === 'Finalizado' ? 'bg-success' : 'bg-warning text-dark'}">
-          ${r.estado || 'Enviado'}
-        </span>
-      </td>
-      <td>${r.fecha || '-'}</td>
-      <td class="text-center">
-        <button class="btn btn-sm btn-outline-primary" onclick="abrirObservacionesAutor('${r.fileId}', 'Revision R${r.numero}')">
-          <i class="bi bi-eye"></i> Ver observaciones
-        </button> 
-      </td>
-    </tr>
-  `).join("");
+  
+  tbody.innerHTML = revs.map(r => {
+    const tipoRevision = r.tipoRevision || "Doble Ciego";
+
+    // Obtenemos la identidad procesada mediante la función blindada
+    const identidades = obtenerIdentidadesVisiblesCliente(
+      tipoRevision, 
+      "Autor", 
+      r.revisor || "Pendiente"
+    );
+
+    const badge = BADGE_ESTADO_REV[r.estado] || "bg-secondary";
+    let revisorVisual = identidades.revisor;
+    
+    // CORREGIDO: Solo forzar el tag explicativo si la función determinó que debe ser oculto
+    if (revisorVisual === "Anónimo (Revisor)") {
+      revisorVisual = `Anónimo (${tipoRevision})`;
+    }
+
+    return `
+      <tr>
+        <td class="fw-bold align-middle">R${r.numero}</td>
+        <td class="align-middle">
+          <i class="bi ${(tipoRevision.toLowerCase().trim() === 'abierta') ? 'bi-person-check' : 'bi-eye-slash-fill text-muted'} me-1"></i>
+          ${revisorVisual}
+        </td>
+        <td class="align-middle">
+          <span class="badge ${badge} rounded-pill px-2">
+            ${r.estado || 'Pendiente'}
+          </span>
+        </td>
+        <td class="align-middle text-muted small">${r.fecha || '-'}</td>
+        <td class="text-center align-middle">
+          ${r.fileId ? `
+            <button class="btn btn-sm btn-outline-primary shadow-sm" onclick="abrirObservacionesAutor('${r.fileId}', 'Revision R${r.numero}')">
+              <i class="bi bi-eye"></i> Ver observaciones
+            </button> ` : `
+            <button class="btn btn-sm btn-outline-secondary border-dashed" disabled title="Evaluación en progreso">
+              <i class="bi bi-hourglass-split"></i> En espera
+            </button>
+          `}
+        </td>
+      </tr>`;
+  }).join("");
 }
 
-// --- 3. ACCIONES DE USUARIO ---
+// --- 4. ACCIONES DE USUARIO ---
 
 /**
  * Actualiza la versión activa en pantalla y refresca la previsualización y revisiones.
- * @function seleccionarVersion
- * @param {number} index - Índice del arreglo 'versiones'.
+ * Integra Throbber intermedio para evitar transiciones toscas en el DOM.
  */
 function seleccionarVersion(index) {
   if (!versiones[index]) return;
   versionActual = versiones[index];
+  
+  // INYECTADO: Throbber de carga intermedio para la sección de revisiones
+  const tbody = document.getElementById("tablaRevisiones");
+  if (tbody) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="5" class="text-center text-muted py-4">
+          <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+          Consultando dictámenes de la versión...
+        </td>
+      </tr>`;
+  }
+
+  // Carga asíncrona del Canvas/Imagen PDF
   cargarPreview(versionActual.fileId);
-  renderRevisionesVersion(versionActual.revisiones);
+  
+  // Pequeña microtarea para permitir que el Throbber se pinte antes de renderizar los datos
+  setTimeout(() => {
+    renderRevisionesVersion(versionActual.revisiones);
+  }, 180);
+
   const links = document.querySelectorAll("#tabsVersiones .nav-link");
   links.forEach((link, i) => {
     link.classList.toggle("active", i === index);
@@ -144,8 +230,6 @@ function seleccionarVersion(index) {
 
 /**
  * Carga una miniatura del PDF desde Drive o muestra acceso directo si falla.
- * @function cargarPreview
- * @param {string} fileId - ID del archivo en Google Drive.
  */
 function cargarPreview(fileId) {
   const preview = document.getElementById("previewPDF");
@@ -175,7 +259,6 @@ function cargarPreview(fileId) {
 
 /**
  * Abre el archivo seleccionado en una nueva pestaña de Google Drive.
- * @function abrirVersion
  */
 function abrirVersion() {
   if (!versionActual || !versionActual.fileId) {
@@ -187,7 +270,6 @@ function abrirVersion() {
 
 /**
  * Muestra el modal de confirmación antes de proceder con la eliminación.
- * @function eliminarVersion
  */
 function eliminarVersion() {
   if (!versionActual) {
@@ -201,12 +283,10 @@ function eliminarVersion() {
   btnConfirmar.onclick = () => ejecutarEliminacionVersion(instanciaModal);
 }
 
-// --- 4. ELIMINACIÓN Y SUBIDA ---
+// --- 5. ELIMINACIÓN Y SUBIDA ---
 
 /**
  * Ejecuta la llamada al servidor para eliminar la versión física y lógica.
- * @function ejecutarEliminacionVersion
- * @param {bootstrap.Modal} instanciaModal - Instancia del modal para cerrarlo.
  */
 function ejecutarEliminacionVersion(instanciaModal) {
   const statusArea = document.getElementById("statusEliminar");
@@ -228,8 +308,6 @@ function ejecutarEliminacionVersion(instanciaModal) {
 
 /**
  * Lee el archivo seleccionado y lo envía al servidor como Base64.
- * @async
- * @function procesarNuevaVersion
  */
 async function procesarNuevaVersion() {
   const fileInput = document.getElementById('fileInputNuevaVersion');
@@ -237,6 +315,7 @@ async function procesarNuevaVersion() {
   const statusArea = document.getElementById('statusSubidaVersion');
   if (!fileInput.files.length) return alert("Selecciona un archivo PDF.");
   if (!versionesFolderId) return alert("Error técnico: Carpeta de versiones no identificada.");
+  
   const archivo = fileInput.files[0];
   toggleUIState([btnSubir], statusArea, true);
   const reader = new FileReader();
@@ -246,8 +325,14 @@ async function procesarNuevaVersion() {
       .withSuccessHandler(() => {
         fileInput.value = "";
         toggleUIState([btnSubir], statusArea, false);
-        bootstrap.Modal.getInstance(document.getElementById('modalNuevaVersion'))?.hide();
-        setTimeout(() => cargarDetalleDocumento(), 1000);
+        
+        const modalEl = document.getElementById('modalNuevaVersion');
+        if (modalEl) {
+          const instance = bootstrap.Modal.getInstance(modalEl);
+          if (instance) instance.hide();
+        }
+        
+        cargarDetalleDocumento();
       })
       .withFailureHandler(err => {
         toggleUIState([btnSubir], statusArea, false);
@@ -260,10 +345,6 @@ async function procesarNuevaVersion() {
 
 /**
  * Alterna estados de carga en botones y spinners.
- * @function toggleUIState
- * @param {Array<HTMLElement>} buttons - Lista de botones a bloquear/desbloquear.
- * @param {HTMLElement} statusElement - Elemento de feedback visual.
- * @param {boolean} isLoading - Estado de carga.
  */
 function toggleUIState(buttons, statusElement, isLoading) {
   buttons.forEach(btn => { if(btn) btn.disabled = isLoading; });
@@ -273,47 +354,7 @@ function toggleUIState(buttons, statusElement, isLoading) {
 }
 
 /**
- * Ejecuta la asignación de un revisor utilizando los datos de la versión activa.
- * @function ejecutarAsignacion
- */
-function ejecutarAsignacion() {
-  const emailInput = document.getElementById("emailRevisor");
-  const email = emailInput ? emailInput.value.trim() : "";
-  const idArchivoV = versionActual ? versionActual.fileId : null;
-  const folderRevId = revisionesFolderId;
-  if (!idArchivoV) return alert("Error: No se ha detectado una versión seleccionada.");
-  if (!folderRevId) return alert("Error técnico: No se encontró la carpeta de revisiones.");
-  if (!validarEmail(email)) {
-    mostrarMensajeRev("Por favor, ingresa un correo válido.", "text-danger");
-    return;
-  }
-  const btn = event.currentTarget;
-  const originalHTML = btn.innerHTML;
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Asignando...';
-  google.script.run
-    .withSuccessHandler((res) => {
-      btn.disabled = false;
-      btn.innerHTML = originalHTML;
-      if (res.success) {
-        emailInput.value = "";
-        mostrarMensajeRev("¡Revisión R" + res.num + " asignada con éxito!", "text-success");
-        setTimeout(() => cargarDetalleDocumento(), 1500);
-      }
-    })
-    .withFailureHandler((err) => {
-      btn.disabled = false;
-      btn.innerHTML = originalHTML;
-      mostrarMensajeRev("Error al asignar: " + err.message, "text-danger");
-    })
-    .asignarRevision(idArchivoV, email, folderRevId);
-}
-
-/**
  * Muestra feedback visual al usuario tras una asignación.
- * @function mostrarMensajeRev
- * @param {string} texto - Mensaje a mostrar.
- * @param {string} clase - Clase CSS para el estilo.
  */
 function mostrarMensajeRev(texto, clase) {
   const el = document.getElementById("msgAsignacion");
@@ -327,9 +368,6 @@ function mostrarMensajeRev(texto, clase) {
 
 /**
  * Validador básico de formato de email.
- * @function validarEmail
- * @param {string} email - Correo a validar.
- * @returns {boolean}
  */
 function validarEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -337,9 +375,6 @@ function validarEmail(email) {
 
 /**
  * Prepara los datos globales y navega a la vista del visor del autor.
- * @function abrirObservacionesAutor
- * @param {string} fileId - ID del archivo de revisión.
- * @param {string} nombre - Nombre descriptivo para la revisión.
  */
 function abrirObservacionesAutor(fileId, nombre) {
   if (!fileId) return alert("Archivo no disponible.");

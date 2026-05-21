@@ -1,0 +1,265 @@
+<script>
+/**
+ * js_revisiones.html - Lógica para la gestión y visualización de la lista de revisiones (Vista Revisor).
+ */
+
+// --- 1. VARIABLES GLOBALES Y CONFIGURACIÓN ---
+let todasLasRevisiones = [];
+let criterioRev = "Nombre";
+
+// Mapeo estricto de badges alineados con el motor relacional del backend
+const BADGE_ESTADO_REV = {
+  "Pendiente":   "bg-secondary",
+  "Asignado":    "bg-primary",
+  "En Revisión": "bg-warning text-dark",
+  "En revisión": "bg-warning text-dark", // Salvaguarda por minúsculas
+  "A Corregir":  "bg-danger",
+  "Finalizado":  "bg-success",
+  "Aprobado":    "bg-success"
+};
+
+/**
+ * Inicializador de la vista de revisiones.
+ */
+function cargarRevisiones() {
+  cargarTablaRevisiones();
+}
+
+/**
+ * Realiza la llamada al servidor para obtener las revisiones asignadas al usuario actual.
+ */
+function cargarTablaRevisiones() {
+  const tbody = document.getElementById("tablaRevisiones");
+  if (!tbody) return;
+
+  // Render de carga inicial (Sincronizado a 5 columnas para evitar desajustes visuales)
+  tbody.innerHTML = `
+    <tr>
+      <td colspan="5" class="text-center text-muted py-4">
+        <div class="spinner-border spinner-border-sm text-primary me-2"></div>
+        Consultando asignaciones en el servidor...
+      </td>
+    </tr>`;
+
+  // Mecanismo de seguridad (Timeout) por si la respuesta de Google Apps Script demora
+  const timeout = setTimeout(() => {
+    if (tbody.dataset.cargando === "true") {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="5" class="text-center text-muted py-3">
+            <i class="bi bi-hourglass-bottom me-1"></i> El servidor está tardando demasiado en responder. Reintente más tarde.
+          </td>
+        </tr>`;
+    }
+  }, 12000);
+
+  tbody.dataset.cargando = "true";
+
+  google.script.run
+    .withSuccessHandler(data => {
+      tbody.dataset.cargando = "false";
+      clearTimeout(timeout);
+      todasLasRevisiones = data || [];
+      renderTablaRevisiones(todasLasRevisiones);
+    })
+    .withFailureHandler(err => {
+      tbody.dataset.cargando = "false";
+      clearTimeout(timeout);
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="5" class="text-center text-danger py-3">
+            <i class="bi bi-exclamation-triangle-fill me-1"></i> Error de comunicación: ${err.message}
+          </td>
+        </tr>`;
+    })
+    .obtenerRevisiones_Usuario();
+}
+
+// --- 2. FILTRADO Y BÚSQUEDA ---
+
+/**
+ * Actualiza el criterio de ordenamiento/búsqueda de la UI.
+ * @param {string} valor - Criterio seleccionado ("Nombre", "Autor" o "Estado").
+ */
+function setBuscarPorRev(valor) {
+  criterioRev = valor;
+  const el = document.getElementById("criterioActualRev");
+  if (el) el.textContent = valor;
+  filtrarRevisiones();
+}
+
+/**
+ * Ejecuta el filtro reactivo sobre el listado en memoria.
+ * AGREGA SOPORTE: Ahora permite filtrar opcionalmente por el autor procesado.
+ */
+function filtrarRevisiones() {
+  const query = document.getElementById("buscadorRev")?.value.toLowerCase() || "";
+  const filtrados = todasLasRevisiones.filter(rev => {
+    const nombre = rev.nombreDoc ? rev.nombreDoc.toLowerCase() : "";
+    const estado = rev.estado ? rev.estado.toLowerCase() : "";
+    
+    // Obtenemos el autor procesado idéntico al render para buscar sobre el texto real visible
+    const identidadAutor = obtenerIdentidadAutorCliente(rev.tipoRevision, rev.autor);
+    const autorVisible = identidadAutor.toLowerCase();
+    
+    if (criterioRev === "Nombre") return nombre.includes(query);
+    if (criterioRev === "Autor")  return autorVisible.includes(query);
+    if (criterioRev === "Estado") return estado.includes(query);
+    return true;
+  });
+  renderTablaRevisiones(filtrados);
+}
+
+// --- 3. REGLAS DE PRIVACIDAD LOCALES (INTERCEPTOR) ---
+
+/**
+ * Evalúa y protege la identidad del Autor desde la perspectiva de la vista del Revisor.
+ * @param {string} tipo - Modalidad de arbitraje ("Abierta", "Simple Ciego", "Doble Ciego")
+ * @param {string} autorOriginal - Correo o nombre del autor proveniente del backend
+ * @returns {string} String sanitizado para mostrar en pantalla
+ */
+function obtenerIdentidadAutorCliente(tipo, autorOriginal) {
+  const tipoLimpio = (tipo || "Doble Ciego").trim().toLowerCase();
+  const autorLimpio = (autorOriginal || "Desconocido").trim();
+
+  // Si la revisión es Abierta o Simple Ciego, el revisor sí puede saber quién es el autor
+  if (tipoLimpio === "abierta" || tipoLimpio === "simple ciego") {
+    return autorLimpio;
+  }
+
+  // Si es Ciego (Simple o Doble), se enmascara estrictamente para resguardar el proceso
+  return "Anónimo (Autor)";
+}
+
+// --- 4. RENDERIZADO DE INTERFAZ (UI) ---
+
+/**
+ * Genera el cuerpo de la tabla incorporando de forma segura la columna del Autor.
+ * @param {Array<Object>} revs - Lista de revisiones procesadas.
+ */
+function renderTablaRevisiones(revs) {
+  const tbody = document.getElementById("tablaRevisiones");
+  if (!tbody) return;
+
+  if (!revs || revs.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="5" class="text-center text-muted py-3">
+          No se encontraron evaluaciones asignadas bajo este criterio.
+        </td>
+      </tr>`;
+    return;
+  }
+
+  tbody.innerHTML = revs.map(rev => {
+    const badge = BADGE_ESTADO_REV[rev.estado] || "bg-secondary";
+    const botones = generarBotones(rev);
+    
+    // Evaluamos la modalidad usando la función interceptora local
+    const tipoRevision = rev.tipo || rev.tipoRevision || "Doble Ciego";
+    const autorVisual = obtenerIdentidadAutorCliente(tipoRevision, rev.autor);
+    
+    return `
+      <tr>
+        <td class="align-middle fw-semibold">
+          <i class="bi bi-file-earmark-pdf me-2 text-danger"></i>${rev.nombreDoc || 'Documento sin título'}
+        </td>
+        <td class="align-middle text-body">
+          <i class="bi ${autorVisual.includes('Anónimo') ? 'bi-shield-lock-fill text-muted' : 'bi-person-circle text-primary'} me-1"></i>
+          ${autorVisual}
+        </td>
+        <td class="align-middle text-center">
+          <span class="badge ${badge} rounded-pill px-3">${rev.estado || 'Pendiente'}</span>
+        </td>
+        <td class="align-middle text-muted small">${rev.fecha || '-'}</td>
+        <td class="align-middle text-center">${botones}</td>
+      </tr>`;
+  }).join("");
+}
+
+/**
+ * Determina qué acciones tiene permitidas el Revisor según el estado transaccional.
+ * @param {Object} rev - Objeto de datos de la revisión.
+ * @returns {string} Bloque de botones HTML correspondiente.
+ */
+function generarBotones(rev) {
+  const id = rev.idArchivoRev;
+  if (!id) return `<span class="text-muted small">—</span>`;
+
+  switch (rev.targetEstado || rev.estado) {
+    case "Pendiente":
+      return `
+        <button class="btn btn-sm btn-success me-1 shadow-sm" onclick="cambiarEstado(this, '${id}', 'Asignado')">
+          <i class="bi bi-check-lg"></i> Aceptar
+        </button>
+        <button class="btn btn-sm btn-outline-danger shadow-sm" onclick="cambiarEstado(this, '${id}', 'Rechazado')">
+          <i class="bi bi-x-lg"></i> Rechazar
+        </button>`;
+
+    case "Asignado":
+      return `
+        <button class="btn btn-sm btn-warning shadow-sm fw-medium" onclick="cambiarEstado(this, '${id}', 'En Revisión')">
+          <i class="bi bi-play-fill"></i> Iniciar Revisión
+        </button>`;
+
+    case "En Revisión":
+    case "En revisión":
+      return `
+        <button class="btn btn-sm btn-primary shadow-sm" onclick="abrirRevision('${id}')">
+          <i class="bi bi-pencil-square"></i> Evaluar Documento
+        </button>`;
+
+    case "Aprobado":
+    case "A Corregir":
+    case "Finalizado":
+      return `
+        <button class="btn btn-sm btn-outline-primary shadow-sm" onclick="abrirRevision('${id}')">
+          <i class="bi bi-eye"></i> Ver Evaluación
+        </button>`;
+
+    default:
+      return `<span class="text-muted small">—</span>`;
+  }
+}
+
+// --- 5. ACCIONES ASÍNCRONAS ---
+
+/**
+ * Transiciona el estado de la revisión en el servidor.
+ * @param {HTMLElement} elementoBtn - Instancia del botón que disparó la acción.
+ * @param {string} idArchivoR - ID del archivo de revisión en Drive.
+ * @param {string} nuevoEstado - Siguiente estado objetivo.
+ */
+function cambiarEstado(elementoBtn, idArchivoR, nuevoEstado) {
+  if (!elementoBtn) return;
+  
+  // Bloqueo preventivo de la UI
+  elementoBtn.disabled = true;
+  const contenidoOriginal = elementoBtn.innerHTML;
+  elementoBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span>';
+
+  google.script.run
+    .withSuccessHandler(() => {
+      cargarTablaRevisiones();
+    })
+    .withFailureHandler(err => {
+      elementoBtn.disabled = false;
+      elementoBtn.innerHTML = contenidoOriginal;
+      alert("Error al procesar el cambio de estado: " + err.message);
+    })
+    .cambiarEstadoRevision(idArchivoR, nuevoEstado);
+}
+
+/**
+ * Enruta la aplicación hacia el espacio de trabajo de edición del Revisor.
+ * @param {string} idArchivoR - ID de la revisión.
+ */
+function abrirRevision(idArchivoR) {
+  if (!idArchivoR) return alert("ID de revisión no disponible.");
+  window.ID_REVISION_ACTUAL = idArchivoR;
+  cargarVista("page_revisor_visor");
+}
+
+// Ejecución automática al instanciar el script
+cargarTablaRevisiones();
+</script>

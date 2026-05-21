@@ -31,13 +31,17 @@
   </button>
 
   <button 
+    id="btnDocumentos"
     class="btn btn-light m-2" 
+    style="display:none"
     onclick="cargarVista('page_documentos')">
     Mis Documentos
   </button>
 
   <button 
-    class="btn btn-light m-2" 
+    id="btnRevisiones"
+    class="btn btn-light m-2"
+    style="display:none"
     onclick="cargarVista('page_revisiones')">
     Revisiones Asignadas
   </button>
@@ -53,7 +57,13 @@
     onclick="cargarVista('page_manual')">
     Manual
   </button>
-  
+  <button 
+    id="btnAdmin"
+    class="btn btn-light m-2"
+    style="display:none"
+    onclick="cargarVista('page_admin')">
+    Panel Admin
+  </button>
 </nav>
 
 <script>

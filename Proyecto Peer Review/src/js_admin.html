@@ -1,0 +1,560 @@
+<script>
+/**
+ * js_admin.html - Lógica del Panel de Administración con Tipo de Revisión
+ */
+
+let todosLosDocsAdmin = [];
+let criterioAdmin = "Nombre";
+let docSeleccionadoAdmin = null;
+let versionSeleccionadaAdmin = null;
+
+// CORREGIDO: Normalización estricta de strings para coincidir con el motor inductivo (Documentos.gs)
+const BADGE_ADMIN = {
+  "Pendiente":   "bg-secondary",
+  "Aceptado":    "bg-primary",
+  "En revisión": "bg-warning text-dark",
+  "En Revisión": "bg-warning text-dark", // Salvaguarda
+  "A Corregir":  "bg-danger",
+  "Rechazado":   "bg-danger",
+  "Aprobado":    "bg-success"
+};
+
+const BADGE_TIPO_REVISION = {
+  "Abierta":      "bg-secondary text-white",
+  "Simple Ciego": "bg-primary text-white", 
+  "Doble Ciego":  "bg-dark text-white"
+};
+
+function cargarAdmin() {
+  const tbody = document.getElementById("tablaAdmin");
+  if (!tbody) return;
+
+  tbody.dataset.cargando = "true";
+  tbody.innerHTML = `
+    <tr>
+      <td colspan="5" class="text-center text-muted py-4">
+        <div class="spinner-border spinner-border-sm text-primary me-2"></div>
+        Cargando documentos...
+      </td>
+    </tr>`;
+
+  const timeout = setTimeout(() => {
+    if (tbody.dataset.cargando === "true") {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="5" class="text-center text-muted py-3">
+            No se encontraron documentos o tardó demasiado.
+          </td>
+        </tr>`;
+    }
+  }, 10000);
+
+  google.script.run
+    .withSuccessHandler(data => {
+      tbody.dataset.cargando = "false";
+      clearTimeout(timeout);
+      todosLosDocsAdmin = data || [];
+      renderTablaAdmin(todosLosDocsAdmin);
+    })
+    .withFailureHandler(err => {
+      tbody.dataset.cargando = "false";
+      clearTimeout(timeout);
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="5" class="text-center text-danger py-3">
+            Error al cargar: ${err.message}
+          </td>
+        </tr>`;
+    })
+    .obtenerTodosDocumentos();
+}
+
+function setCriterioAdmin(valor) {
+  criterioAdmin = valor;
+  const el = document.getElementById("criterioAdmin");
+  if (el) el.textContent = valor;
+  filtrarAdmin();
+}
+
+function filtrarAdmin() {
+  const query = document.getElementById("buscadorAdmin")?.value.toLowerCase() || "";
+  const filtrados = todosLosDocsAdmin.filter(doc => {
+    if (criterioAdmin === "Nombre") return doc.nombre.toLowerCase().includes(query);
+    if (criterioAdmin === "Autor")  return doc.autor.toLowerCase().includes(query);
+    if (criterioAdmin === "Estado") return doc.estado.toLowerCase().includes(query);
+    return true;
+  });
+  renderTablaAdmin(filtrados);
+}
+
+function renderTablaAdmin(docs) {
+  const tbody = document.getElementById("tablaAdmin");
+  if (!tbody) return;
+
+  if (!docs || docs.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="5" class="text-center text-muted py-3">
+          No hay documentos registrados en el sistema.
+        </td>
+      </tr>`;
+    return;
+  }
+
+  tbody.innerHTML = docs.map(doc => {
+    const badge = BADGE_ADMIN[doc.estado] || "bg-secondary";
+    return `
+      <tr>
+        <td class="align-middle fw-semibold">
+          <i class="bi bi-file-earmark-pdf me-1 text-danger"></i>
+          ${doc.nombre}
+        </td>
+        <td class="align-middle text-muted small">${doc.autor}</td>
+        <td class="align-middle text-center">
+          <span class="badge ${badge} rounded-pill px-3">${doc.estado}</span>
+        </td>
+        <td class="align-middle text-muted small">${doc.fecha}</td>
+        <td class="align-middle text-center">
+          <button
+            class="btn btn-sm btn-outline-primary"
+            onclick="abrirModalAsignar('${doc.idRaiz}', '${doc.nombre}', '${doc.versionesId}', '${doc.revisionesId}')">
+            <i class="bi bi-person-plus"></i> Asignar Revisor
+          </button>
+        </td>
+      </tr>`;
+  }).join("");
+}
+
+function abrirModalAsignar(idRaiz, nombre, versionesId, revisionesId) {
+  docSeleccionadoAdmin = { idRaiz, nombre, versionesId, revisionesId };
+
+  const tabsEl   = document.getElementById("tabsVersionesAdmin");
+  const listaEl  = document.getElementById("listaRevisoresAsignados");
+  const emailEl  = document.getElementById("emailRevisorAdmin");
+  const msgEl    = document.getElementById("msgAsignarAdmin");
+  const nombreEl = document.getElementById("nombreDocAsignar");
+
+  if (nombreEl) nombreEl.textContent = nombre;
+  if (emailEl)  emailEl.value = "";
+  if (msgEl)    msgEl.textContent = "";
+  if (tabsEl)   tabsEl.innerHTML = `<li class="nav-item"><span class="nav-link disabled">Cargando...</span></li>`;
+  if (listaEl)  listaEl.innerHTML = `<div class="text-center py-2"><div class="spinner-border spinner-border-sm"></div></div>`;
+
+  new bootstrap.Modal(document.getElementById("modalAsignar")).show();
+
+  google.script.run
+    .withSuccessHandler(renderVersionesTabs)
+    .withFailureHandler(() => {
+      if (listaEl) listaEl.innerHTML = `<p class="text-danger small mb-0">Error al cargar.</p>`;
+    })
+    .obtenerRevisionesDeDocumentoPorVersion(idRaiz);
+
+  cargarRevisoresSistema();
+}
+
+function renderVersionesTabs(data) {
+  const tabsEl = document.getElementById("tabsVersionesAdmin");
+  const listaEl = document.getElementById("listaRevisoresAsignados");
+
+  if (!tabsEl || !listaEl) return;
+
+  // NOTA: Se asume que data viene estructurado como un arreglo o un objeto con nodo .versiones
+  const versiones = Array.isArray(data) ? data : (data.versiones || []);
+  window._versionesAdmin = versiones;
+
+  if (!versiones || versiones.length === 0) {
+    tabsEl.innerHTML = `<li class="nav-item"><span class="nav-link disabled">Sin versiones</span></li>`;
+    listaEl.innerHTML = `<p class="text-muted small mb-0">Sin revisores asignados aún.</p>`;
+    return;
+  }
+
+  tabsEl.innerHTML = versiones.map((ver, i) => `
+    <li class="nav-item">
+      <a class="nav-link ${i === 0 ? 'active' : ''}" href="#"
+         onclick="seleccionarVersionAdmin(${i}); return false;">
+        V${ver.numero}
+      </a>
+    </li>
+  `).join("");
+
+  seleccionarVersionAdmin(0);
+}
+
+function seleccionarVersionAdmin(index) {
+  const versiones = window._versionesAdmin || [];
+  if (!versiones[index]) return;
+
+  versionSeleccionadaAdmin = versiones[index];
+
+  const links = document.querySelectorAll("#tabsVersionesAdmin .nav-link");
+  links.forEach((link, i) => link.classList.toggle("active", i === index));
+
+  const listaEl = document.getElementById("listaRevisoresAsignados");
+  if (!listaEl) return;
+
+  const { revisores } = versionSeleccionadaAdmin;
+
+  if (!revisores || revisores.length === 0) {
+    listaEl.innerHTML = `<p class="text-muted small mb-0 p-2">Sin revisores en esta versión.</p>`;
+    return;
+  }
+
+  listaEl.innerHTML = revisores.map(rev => {
+    const badgeTipo = BADGE_TIPO_REVISION[rev.tipoRevision] || "bg-light text-dark";
+    return `
+      <div class="d-flex justify-content-between align-items-center py-1 border-bottom px-1">
+        <div class="d-flex flex-column" style="max-width: 60%;">
+          <span class="small text-truncate fw-semibold" title="${rev.emailRevisor}">
+            ${rev.emailRevisor}
+          </span>
+          <span class="badge ${badgeTipo} align-self-start mt-1" style="font-size: 0.65rem; padding: 2px 6px;">
+            ${rev.tipoRevision || 'No definido'}
+          </span>
+        </div>
+        <div class="d-flex align-items-center gap-1">
+          <span class="badge ${BADGE_ESTADO_REV[rev.estado] || 'bg-secondary'} rounded-pill" style="font-size: 0.75rem;">${rev.estado}</span>
+          ${rev.estado === "Pendiente" ? `
+            <button class="btn btn-xs btn-outline-danger p-1 d-flex align-items-center justify-content-center" 
+                    onclick="quitarRevisor('${rev.idArchivoR}')"
+                    title="Quitar revisor"
+                    style="width: 24px; height: 24px;">
+              X
+            </button>` : ''}
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
+function quitarRevisor(idArchivoR) {
+  const msg = document.getElementById("msgAsignarAdmin");
+
+  if (msg) {
+    msg.className = "mt-2 small fw-bold text-info";
+    msg.textContent = "Eliminando revisor...";
+  }
+
+  google.script.run
+    .withSuccessHandler(() => {
+      if (msg) {
+        msg.className = "mt-2 small fw-bold text-success";
+        msg.textContent = "Revisor eliminado correctamente.";
+      }
+      // Actualizar tabla y modal en cascada
+      cargarAdmin(); 
+      google.script.run
+        .withSuccessHandler(renderVersionesTabs)
+        .obtenerRevisionesDeDocumentoPorVersion(docSeleccionadoAdmin.idRaiz);
+    })
+    .withFailureHandler(err => {
+      if (msg) {
+        msg.className = "mt-2 small fw-bold text-danger";
+        msg.textContent = "Error: " + err.message;
+      }
+    })
+    .quitarRevisorDeVersion(idArchivoR);
+}
+
+/**
+ * Procesa la asignación de un revisor a una versión específica,
+ * capturando de forma correcta el Tipo de Revisión seleccionado en el Modal.
+ */
+function confirmarAsignacion() {
+  const btn = document.getElementById("btnConfirmarAsignar");
+  const msg = document.getElementById("msgAsignarAdmin");
+  const emailInput = document.getElementById("emailRevisorAdmin");
+  
+  if (!emailInput || !btn || !msg) return;
+
+  const email = emailInput.value.trim();
+  if (!email) {
+    msg.className = "mt-2 small fw-bold text-danger";
+    msg.textContent = "Por favor, introduce un correo electrónico válido.";
+    return;
+  }
+
+  // Determinamos qué selector de Tipo de Revisión usar. 
+  // Si el usuario escribió un correo a mano, priorizamos el selector por correo;
+  // si no, tomamos el de la lista predefinida del sistema.
+  let tipoRevisionSeleccionado = "Doble Ciego"; // Valor por defecto seguro
+  
+  const selectCorreo = document.getElementById("tipoRevisionCorreoAdmin");
+  const selectLista = document.getElementById("tipoRevisionListaAdmin");
+
+  if (selectCorreo && selectCorreo.value) {
+    tipoRevisionSeleccionado = selectCorreo.value;
+  } else if (selectLista && selectLista.value) {
+    tipoRevisionSeleccionado = selectLista.value;
+  }
+
+  // Deshabilitar UI durante la transacción en el servidor
+  btn.disabled = true;
+  const textoOriginalBtn = btn.innerHTML;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+  msg.textContent = "";
+
+  // Recuperamos las variables de contexto global de la versión y documento seleccionados en el panel
+  const idArchivoV = window.ID_VERSION_SELECCIONADA_ADMIN; 
+  const idDocumentoRaiz = window.ID_DOC_RAIZ_SELECCIONADO_ADMIN;
+
+  if (!idArchivoV) {
+    btn.disabled = false;
+    btn.innerHTML = textoOriginalBtn;
+    msg.className = "mt-2 small fw-bold text-danger";
+    msg.textContent = "Error: No se ha detectado una versión seleccionada en las pestañas.";
+    return;
+  }
+
+  // EJECUCIÓN AL SERVIDOR (Paso de parámetros sincronizados con la columna 7)
+  google.script.run
+    .withSuccessHandler(respuesta => {
+      btn.disabled = false;
+      btn.innerHTML = textoOriginalBtn;
+      emailInput.value = ""; // Limpiar campo
+      
+      msg.className = "mt-2 small fw-bold text-success";
+      msg.textContent = "¡Revisor asignado exitosamente bajo la modalidad " + tipoRevisionSeleccionado + "!";
+      
+      // Refrescar la lista de asignados actual en el modal y la tabla principal
+      if (typeof cargarRevisoresAsignadosAVersion === "function") {
+        cargarRevisoresAsignadosAVersion(idArchivoV);
+      }
+      if (typeof cargarTablaDocumentosAdmin === "function") {
+        cargarTablaDocumentosAdmin(); 
+      }
+    })
+    .withFailureHandler(err => {
+      btn.disabled = false;
+      btn.innerHTML = textoOriginalBtn;
+      msg.className = "mt-2 small fw-bold text-danger";
+      msg.textContent = "Error en el servidor: " + err.message;
+    })
+    // Envia: ID_Version, Correo_Revisor, Tipo_Revision e ID_Doc_Raiz de control
+    .asignarRevisor_Servidor(idArchivoV, email, tipoRevisionSeleccionado, idDocumentoRaiz);
+}
+
+function cargarRevisoresSistema() {
+  const listaEl = document.getElementById("listaRevisoresSistema");
+  if (!listaEl) return;
+
+  google.script.run
+    .withSuccessHandler(data => {
+      if (!data || data.length === 0) {
+        listaEl.innerHTML = `<p class="text-muted small mb-0 p-1">No hay revisores registrados.</p>`;
+        return;
+      }
+      listaEl.innerHTML = data.map(rev => `
+        <div class="d-flex justify-content-between align-items-center py-1 border-bottom px-1">
+          <div style="max-width: 70%;">
+            <div class="small fw-semibold text-truncate">${rev.nombre}</div>
+            <div class="text-muted" style="font-size:0.75rem;">${rev.email}</div>
+          </div>
+          <button class="btn btn-sm btn-outline-primary"
+                  onclick="asignarDesdeListaSistema(this, '${rev.email}')">
+            Asignar
+          </button>
+        </div>
+      `).join("");
+    })
+    .withFailureHandler(() => {
+      listaEl.innerHTML = `<p class="text-danger small mb-0">Error al cargar.</p>`;
+    })
+    .obtenerRevisoresDelSistema();
+}
+
+// CORREGIDO: Recibe 'btn' directamente por parámetro (this) en lugar de evaluar eventos sueltos
+function asignarDesdeListaSistema(btn, email) {
+  const msg = document.getElementById("msgAsignarAdmin");
+  const tipoRevision = document.getElementById("tipoRevisionListaAdmin")?.value || "Doble Ciego";
+
+  if (!docSeleccionadoAdmin) return;
+
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+  }
+
+  google.script.run
+    .withSuccessHandler(res => {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = "Asignar";
+      }
+      if (res && res.success) {
+        if (msg) {
+          msg.className = "mt-2 small fw-bold text-success";
+          msg.textContent = `¡${email} asignado con éxito!`;
+        }
+        // Sincronizar UI Principal y tabs del modal en cascada
+        cargarAdmin();
+        google.script.run
+          .withSuccessHandler(renderVersionesTabs)
+          .obtenerRevisionesDeDocumentoPorVersion(docSeleccionadoAdmin.idRaiz);
+      }
+    })
+    .withFailureHandler(err => {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = "Asignar";
+      }
+      if (msg) {
+        msg.className = "mt-2 small fw-bold text-danger";
+        msg.textContent = "Error: " + err.message;
+      }
+    })
+    .asignarRevisorDesdeAdmin(docSeleccionadoAdmin.idRaiz, email, docSeleccionadoAdmin.revisionesId, tipoRevision);
+}
+
+function guardarCopiarRevisores() {
+  const checkEl = document.getElementById("checkCopiarRevisores");
+  if (!checkEl || !docSeleccionadoAdmin) return;
+
+  google.script.run.setCopiarRevisores(docSeleccionadoAdmin.idRaiz, checkEl.checked);
+
+  if (checkEl.checked) {
+    const msg = document.getElementById("msgAsignarAdmin");
+    if (msg) {
+      msg.className = "mt-2 small fw-bold text-info";
+      msg.textContent = "Copiando revisores de V1...";
+    }
+
+    google.script.run
+      .withSuccessHandler(res => {
+        if (msg) {
+          msg.className = "mt-2 small fw-bold text-success";
+          msg.textContent = res.mensaje;
+        }
+        google.script.run
+          .withSuccessHandler(renderVersionesTabs)
+          .obtenerRevisionesDeDocumentoPorVersion(docSeleccionadoAdmin.idRaiz);
+      })
+      .withFailureHandler(err => {
+        if (msg) {
+          msg.className = "mt-2 small fw-bold text-danger";
+          msg.textContent = "Error: " + err.message;
+        }
+      })
+      .copiarRevisoresV1AVersionActual(docSeleccionadoAdmin.idRaiz, docSeleccionadoAdmin.revisionesId);
+  }
+}
+
+function abrirModalUsuarios() {
+  const tbody = document.getElementById("tablaUsuarios");
+  const msg   = document.getElementById("msgUsuarios");
+  if (tbody) tbody.innerHTML = `
+    <tr>
+      <td colspan="5" class="text-center text-muted py-3">
+        <div class="spinner-border spinner-border-sm me-2"></div>
+        Cargando usuarios...
+      </td>
+    </tr>`;
+  if (msg) msg.textContent = "";
+
+  new bootstrap.Modal(document.getElementById("modalUsuarios")).show();
+
+  google.script.run
+    .withSuccessHandler(renderTablaUsuarios)
+    .withFailureHandler(err => {
+      if (tbody) tbody.innerHTML = `
+        <tr>
+          <td colspan="5" class="text-center text-danger py-3">
+            Error al cargar: ${err.message}
+          </td>
+        </tr>`;
+    })
+    .obtenerTodosUsuarios();
+}
+
+function renderTablaUsuarios(usuarios) {
+  const tbody = document.getElementById("tablaUsuarios");
+  if (!tbody) return;
+
+  if (!usuarios || usuarios.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="5" class="text-center text-muted py-3">
+          No hay usuarios registrados.
+        </td>
+      </tr>`;
+    return;
+  }
+
+  tbody.innerHTML = usuarios.map(usr => `
+    <tr>
+      <td class="align-middle small fw-semibold">${usr.nombre}</td>
+      <td class="align-middle small text-muted">${usr.email}</td>
+      <td class="align-middle text-center">
+        <input type="checkbox"
+               class="form-check-input"
+               ${usr.roles.includes("Autor") ? "checked" : ""}
+               onchange="toggleRol('${usr.email}', 'Autor', this.checked, this)">
+      </td>
+      <td class="align-middle text-center">
+        <input type="checkbox"
+               class="form-check-input"
+               ${usr.roles.includes("Revisor") ? "checked" : ""}
+               onchange="toggleRol('${usr.email}', 'Revisor', this.checked, this)">
+      </td>
+      <td class="align-middle text-center">
+        <input type="checkbox"
+               class="form-check-input"
+               ${usr.roles.includes("Admin") ? "checked" : ""}
+               onchange="toggleRol('${usr.email}', 'Admin', this.checked, this)">
+      </td>
+    </tr>
+  `).join("");
+}
+
+function toggleRol(email, rol, activo, elemento) {
+  const msg = document.getElementById("msgUsuarios");
+
+  const fila = [...document.querySelectorAll("#tablaUsuarios tr")]
+    .find(tr => tr.textContent.includes(email));
+
+  if (!fila) return;
+
+  const checkboxes = fila.querySelectorAll("input[type=checkbox]");
+  const roles = ["Autor", "Revisor", "Admin"].filter((r, i) => checkboxes[i]?.checked);
+
+  if (msg) {
+    msg.className = "mb-2 small fw-bold text-info";
+    msg.textContent = "Guardando...";
+  }
+
+  if (rol === "Admin" && !activo && email === (window._emailActual || "")) {
+    if (msg) {
+      msg.className = "mb-2 small fw-bold text-danger";
+      msg.textContent = "No puedes quitarte el rol Admin a ti mismo.";
+      setTimeout(() => { msg.textContent = ""; }, 3000);
+    }
+    if (elemento) elemento.checked = true;
+    return;
+  }
+
+  google.script.run
+    .withSuccessHandler(() => {
+      if (msg) {
+        msg.className = "mb-2 small fw-bold text-success";
+        msg.textContent = `Roles de ${email} actualizados.`;
+        setTimeout(() => { msg.textContent = ""; }, 3000);
+      }
+
+      if (email === (window._emailActual || "")) {
+        if (typeof actualizarPermisosYBotonesUI === "function") {
+          actualizarPermisosYBotonesUI(); 
+        }
+      }
+    })
+    .withFailureHandler(err => {
+      if (msg) {
+        msg.className = "mb-2 small fw-bold text-danger";
+        msg.textContent = "Error: " + err.message;
+      }
+      if (elemento) elemento.checked = !activo;
+    })
+    .actualizarRolesUsuario(email, roles);
+}
+
+// Inicialización automática al cargar el componente
+cargarAdmin();
+</script>
