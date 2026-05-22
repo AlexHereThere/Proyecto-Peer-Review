@@ -32,8 +32,19 @@ function obtenerCarpetaRaiz() {
  * @returns {string} El ID de la carpeta de usuario creada o recuperada.
  */
 function inicializarCarpetaUsuario(email) {
-  const raiz = obtenerCarpetaRaiz();
-  return obtenerOCrearCarpeta(email, raiz).getId();
+ const raiz = obtenerCarpetaRaiz();
+ const carpetaUsuario = obtenerOCrearCarpeta(email, raiz);
+
+ try {
+   // Configura la carpeta para que cualquier miembro de la UABC con el enlace pueda editarla
+   //carpetaUsuario.setSharing(DriveApp.Access.DOMAIN_WITH_LINK, DriveApp.Permission.EDIT);
+   carpetaUsuario.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.EDIT);
+   //carpetaUsuario.addEditor("karoeclipse@gmail.com");
+  } catch(e) {
+   console.error("Error al cambiar compartir por dominio: " + e.toString());
+  }
+
+ return carpetaUsuario.getId();
 }
 
 /**
