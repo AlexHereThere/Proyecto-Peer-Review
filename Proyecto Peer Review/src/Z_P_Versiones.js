@@ -20,7 +20,8 @@ function PU_Versiones(rastreo) {
     registrarVersion(idRaiz, fileId, 1, "V1_Prueba.pdf");
     trackVersion(rastreo, idRaiz);
 
-    SpreadsheetApp.flush();
+    SpreadsheetApp.flush(); //escibe fila
+    limpiarCacheDatos(); //borrar caché
 
     // Validación de persistencia
     const data = getSheet_VER().getDataRange().getValues();

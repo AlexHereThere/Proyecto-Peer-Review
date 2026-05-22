@@ -4,30 +4,15 @@
  */
 function PU_Admin(rastreo) {
 
-  Qunit.module("PU_Admin: Configuración de Documentos");
-
-  Qunit.test("Configuración CopiarRevisores", (assert) => {
-    const idDoc = `DOC_CONFIG_${Utilities.getUuid()}`;
-    
-    setCopiarRevisores(idDoc, true);
-    assert.equal(getCopiarRevisores(idDoc), true, "Se guardó y recuperó correctamente la opción true.");
-
-    setCopiarRevisores(idDoc, false);
-    assert.equal(getCopiarRevisores(idDoc), false, "Se actualizó correctamente a false.");
-
-    // Cleanup manual (Configuración no tiene rastreo automático por email)
-    const sheet = getSheet_CON();
-    const data = sheet.getDataRange().getValues();
-    const idx = data.findIndex(r => r[0] === idDoc);
-    if (idx >= 1) sheet.deleteRow(idx + 1);
-  });
-
   Qunit.module("PU_Admin: Gestión de Revisores");
 
   Qunit.test("obtenerRevisoresDelSistema", (assert) => {
     // SETUP: Asegurar al menos un revisor
     const emailRev = `revisor_admin_${Utilities.getUuid()}@uabc.edu.mx`;
     getSheet_USR().appendRow([emailRev, "Revisor Test", "Revisor", "folder", new Date()]);
+    SpreadsheetApp.flush(); //escibe fila
+    limpiarCacheDatos(); //borrar caché
+
     trackUsuario(rastreo, emailRev);
 
     const lista = obtenerRevisoresDelSistema();
@@ -36,31 +21,63 @@ function PU_Admin(rastreo) {
     assert.ok(encontrado, "El usuario con rol Revisor aparece en la lista administrativa.");
     assert.equal(encontrado.nombre, "Revisor Test", "Nombre recuperado correctamente.");
   });
-
+  
   Qunit.test("Asignación desde Admin", (assert) => {
     const idRaiz = `RAIZ_ADMIN_${Utilities.getUuid()}`;
-    const idV1 = `FILE_V1_${Utilities.getUuid()}`;
-    const emailRev = `rev_asignar_${Utilities.getUuid()}@uabc.edu.mx`;
+    const emailRev = Session.getActiveUser().getEmail();
+    const nombreDocOriginal = "Doc Admin Test Ficticio";
 
-    // SETUP
-    getSheet_DOC().appendRow([new Date(), "Doc Admin", idRaiz, "T", "V", "R", "Pendiente", "autor@test.com"]);
-    getSheet_VER().appendRow([idRaiz, idV1, 1, "V1_Doc", new Date()]);
+    let archivoTemporal, carpetaTemporal;
+    let idV1, folderRevId;
+
+    try {
+
+      archivoTemporal = DriveApp.createFile(`V1_${idRaiz}.txt`, "Contenido de la versión inicial del documento.");
+      idV1 = archivoTemporal.getId();
+      trackArchivo(rastreo, idV1); 
+
+      carpetaTemporal = DriveApp.createFolder(`FOLDER_REV_${idRaiz}`);
+      folderRevId = carpetaTemporal.getId();
+      trackCarpeta(rastreo, folderRevId); 
+      
+    } catch (eDrive) {
+      assert.ok(false, `Fallo crítico en el SETUP de Google Drive: ${eDrive.message}`);
+      return; // Detiene el test si no se pudo preparar el entorno de Drive
+    }
+
+    getSheet_DOC().appendRow([new Date(), nombreDocOriginal, idRaiz, "T_ID", "V_ID", "R_ID", "Pendiente", "autor@test.com"]);
+    getSheet_VER().appendRow([idRaiz, idV1, 1, nombreDocOriginal, new Date()]);
+    SpreadsheetApp.flush();
+    limpiarCacheDatos();
     
     trackDoc(rastreo, idRaiz);
-    trackVersion(rastreo, idRaiz);
+    trackVersion(rastreo, idRaiz); 
+    trackActividad(rastreo, nombreDocOriginal); 
+    
 
-    // EJECUCIÓN
+    // EJECUCIÓN DEL MÉTODO A PROBAR
     try {
-      const res = asignarRevisorDesdeAdmin(idRaiz, emailRev, "FOLDER_REV_ID", "Simple Ciego");
-      assert.ok(res.success, "Asignación reportada como exitosa.");
-      trackRevision(rastreo, res.idR);
+      const res = asignarRevisorDesdeAdmin(idRaiz, emailRev, folderRevId, "Simple Ciego");
+      assert.ok(res && res.success, "Asignación reportada como exitosa por el backend.");
+      
+      if (res && res.idR) {
+        trackRevision(rastreo, res.idR);
+        trackArchivo(rastreo, res.idR);  
+        SpreadsheetApp.flush();
+        limpiarCacheDatos();
 
-      // Verificación en BD
-      const revData = findRowInSheet("Revisiones", 1, res.idR);
-      assert.ok(revData, "Registro de revisión creado.");
-      assert.equal(revData[6], "Simple Ciego", "Modalidad persistida correctamente.");
+        const revData = findRowInSheet("Revisiones", 1, res.idR);
+        assert.ok(revData, "El registro de la revisión fue localizado en la hoja 'Revisiones'.");
+        
+        if (revData) {
+          assert.equal(revData[6], "Simple Ciego", "La modalidad de revisión ('Simple Ciego') persistió correctamente en la columna G.");
+        }
+      } else {
+        assert.ok(false, "El método no devolvió un objeto de respuesta válido con un idR.");
+      }
+
     } catch (e) {
-      assert.ok(false, `Error en asignación: ${e.message}`);
+      assert.ok(false, `Excepción atrapada durante la ejecución del test: ${e.message} \nStack: ${e.stack}`);
     }
   });
 }

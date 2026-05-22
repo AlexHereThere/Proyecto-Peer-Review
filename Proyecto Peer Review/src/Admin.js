@@ -20,33 +20,6 @@ function obtenerRevisoresDelSistema() {
 }
 
 /**
- * Obtiene el valor de la configuración "CopiarRevisores" para un documento específico.
- * @param {string} idDocumento - El ID del documento raíz.
- * @returns {boolean} El valor de la configuración o false si no existe.
- */
-function getCopiarRevisores(idDocumento) {
-  const fila = findRowInSheet("Configuracion", 0, idDocumento);
-  return fila ? fila[1] : false;
-}
-
-/**
- * Establece el valor de la configuración "CopiarRevisores" para un documento específico.
- * @param {string} idDocumento - El ID del documento raíz.
- * @param {boolean} valor - El valor a establecer.
- */
-function setCopiarRevisores(idDocumento, valor) {
-  const ss = getSpreed();
-  const sheet = ss.getSheetByName("Configuracion");
-  const data  = getSheetData("Configuracion");
-  const idx  = data.findIndex(row => row[0] === idDocumento);
-  if (idx >= 0) {
-    sheet.getRange(idx + 1, 2).setValue(valor);
-  } else {
-    sheet.appendRow([idDocumento, valor]);
-  }
-}
-
-/**
  * Asigna un revisor a un documento desde la interfaz de administración.
  * @param {string} idRaiz - El ID del documento raíz.
  * @param {string} emailRevisor - El correo electrónico del revisor.

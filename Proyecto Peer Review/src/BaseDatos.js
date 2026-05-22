@@ -12,10 +12,8 @@ const _CACHE_DATOS = {};
  * @returns {GoogleAppsScript.Spreadsheet.Spreadsheet} El objeto Spreadsheet.
  */
 function getSpreed() {
-  if (window._ss_instancia) return window._ss_instancia;
   const id = PropertiesService.getScriptProperties().getProperty('SHEET_ID');
-  window._ss_instancia = SpreadsheetApp.openById(id);
-  return window._ss_instancia;
+  return SpreadsheetApp.openById(id);
 }
 
 /**
@@ -105,14 +103,6 @@ function getSheet_ACT() {
   return getSheetByName("Actividad"); 
 }
 
-/** 
- * Obtiene la hoja de "Configuracion". 
- * @returns {GoogleAppsScript.Spreadsheet.Sheet} La hoja de Configuración.
- */
-function getSheet_CON() { 
-  return getSheetByName("Configuracion"); 
-}
-
 /**
  * Garantiza la existencia de una hoja y sus cabeceras. Si no existe, la crea.
  * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} ss - Instancia de la hoja de cálculo.
@@ -128,4 +118,13 @@ function asegurarHoja(ss, nombre, cabeceras) {
     sheet.setFrozenRows(1);
   }
   return sheet;
+}
+
+/**
+ * Limpia la caché interna de datos. Útil para entornos de prueba (Unit Tests).
+ */
+function limpiarCacheDatos() {
+  for (const key in _CACHE_DATOS) {
+    delete _CACHE_DATOS[key];
+  }
 }

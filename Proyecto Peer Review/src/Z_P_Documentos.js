@@ -23,11 +23,12 @@ function PU_Documentos(rastreo) {
       console.log("Resultado Orquestación:", JSON.stringify(resultado, null, 2));
       assert.equal(resultado, true, "La función orquestadora retornó true.");
 
-      SpreadsheetApp.flush();
+      SpreadsheetApp.flush(); //escibe fila
+      limpiarCacheDatos(); //borrar caché
       Utilities.sleep(500);
 
-      // VALIDACIÓN Y RASTREO
-      SpreadsheetApp.flush();
+      SpreadsheetApp.flush(); //escibe fila
+      limpiarCacheDatos(); //borrar caché
       const datosDoc = findRowInSheet("Documentos", 1, nombreDoc);
       assert.ok(datosDoc, "Documento localizado en BD por nombre.");
       
@@ -55,7 +56,9 @@ function PU_Documentos(rastreo) {
     getSheet_DOC().appendRow([new Date(), "Doc Jerárquico", idRaizFake, "T", "V", "R", "Pendiente", emailActivo]);
     getSheet_VER().appendRow([idRaizFake, verIdFake, 1, "V1_Doc Jerárquico", new Date()]);
 
-    SpreadsheetApp.flush();
+    SpreadsheetApp.flush(); //escibe fila
+    limpiarCacheDatos(); //borrar caché
+  
     trackDoc(rastreo, idRaizFake);
     trackVersion(rastreo, idRaizFake);
 
@@ -75,7 +78,10 @@ function PU_Documentos(rastreo) {
 
     // SETUP
     getSheet_DOC().appendRow([new Date(), "Doc Búsqueda", idRaiz, "T", idCarpeta, "R", "Pendiente", "test@uabc.mx"]);
-    SpreadsheetApp.flush();
+    
+    SpreadsheetApp.flush(); //escibe fila
+   
+    limpiarCacheDatos(); //borrar caché
     trackDoc(rastreo, idRaiz);
 
     // EJECUCIÓN

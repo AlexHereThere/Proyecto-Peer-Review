@@ -19,8 +19,9 @@ function PU_LogicaNegocio() {
     // 3. ASSERTS DE CONFIGURACIÓN
     const propId = PropertiesService.getScriptProperties().getProperty('SHEET_ID');
     assert.equal(propId, id, "El ID se persistió correctamente en ScriptProperties.");
-    });
-    }
+  });
+  PU_Relacional();
+}
 
 
 /**

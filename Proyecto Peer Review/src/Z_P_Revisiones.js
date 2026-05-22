@@ -10,7 +10,8 @@ function PU_Revisiones(rastreo) {
    */
   const registrarRevision_T = (idV, idR, num, email) => {
     db_registrarRevision(idV, idR, num, email, "Pendiente", "Doble Ciego");
-    SpreadsheetApp.flush();
+    SpreadsheetApp.flush(); //escibe fila
+    limpiarCacheDatos(); //borrar caché
     trackRevision(rastreo, idR);
   };
 
@@ -19,7 +20,8 @@ function PU_Revisiones(rastreo) {
    */
   const registrarVersion_T = (filaArray) => {
     getSheet_VER().appendRow(filaArray);
-    SpreadsheetApp.flush();
+    SpreadsheetApp.flush(); //escibe fila
+    limpiarCacheDatos(); //borrar caché
     trackVersion(rastreo, filaArray[0]); // filaArray[0] = idRaiz
   };
 
@@ -39,9 +41,12 @@ function PU_Revisiones(rastreo) {
     const idR = `R_UP_${Utilities.getUuid()}`;
 
     registrarRevision_T("V_PADRE", idR, 1, "test@uabc.edu.mx");
-    db_actualizarEstadoRevision(idR, "Finalizado");
+    db_actualizarEstadoRevision(idR, "Aprobado");
 
-    assert.equal(obtenerEstadoRevision(idR), "Finalizado", "El estado cambió exitosamente a 'Finalizado'.");
+    SpreadsheetApp.flush(); //escibe fila
+    limpiarCacheDatos(); //borrar caché
+
+    assert.equal(obtenerEstadoRevision(idR), "Aprobado", "El estado cambió exitosamente a 'Aprobado'.");
   });
 
   Qunit.module("PU_Revisiones: Lógica de Negocio");
@@ -56,6 +61,9 @@ function PU_Revisiones(rastreo) {
       // Fallback manual si el servicio falla por entorno
       db_actualizarEstadoRevision(idR, "En revisión");
     }
+    
+    SpreadsheetApp.flush(); //escibe fila
+    limpiarCacheDatos(); //borrar caché
 
     assert.equal(obtenerEstadoRevision(idR), "En revisión", "La revisión se inició correctamente.");
   });
@@ -64,7 +72,10 @@ function PU_Revisiones(rastreo) {
     const idR = `R_LOCK_${Utilities.getUuid()}`;
     registrarRevision_T("V1", idR, 1, "test@test.com");
 
-    db_actualizarEstadoRevision(idR, "Finalizado");
+    db_actualizarEstadoRevision(idR, "Aprobado");
+
+    SpreadsheetApp.flush(); //escibe fila
+    limpiarCacheDatos(); //borrar caché
 
     assert.throws(
       () => { guardarComentarios("data", idR); },

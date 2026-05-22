@@ -13,7 +13,8 @@ function PU_User(rastreo) {
    */
   const registrarUsuario_T = (email, nombre, folderId) => {
     registrarUsuario(email, nombre, folderId);
-    SpreadsheetApp.flush();
+    SpreadsheetApp.flush(); //escibe fila
+    limpiarCacheDatos(); //borrar caché
     trackUsuario(rastreo, email);
   };
 
@@ -44,6 +45,8 @@ function PU_User(rastreo) {
 
     // Ejecución con tracking
     registrarUsuario_T(emailTest, nombreTest, folderIdTest);
+    
+    
 
     // Verificación
     const encontrado = buscarUsuario(emailTest);

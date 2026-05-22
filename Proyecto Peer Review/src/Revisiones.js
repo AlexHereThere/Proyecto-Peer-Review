@@ -312,7 +312,7 @@ function obtenerRevisionesDeDocumentoPorVersion(idRaiz) {
       return { numero: ver[2], idArchivoV: ver[1], nombre: ver[3], revisores: revisores };
     });
 
-  return { versiones: versiones, copiarRevisores: getCopiarRevisores(idRaiz) };
+  return { versiones: versiones };
 }
 
 /**
@@ -346,7 +346,14 @@ function guardarComentarios(base64Data, fileId) {
   try {
     const registro = findRowInSheet("Revisiones", 1, fileId);
     if (!registro) throw new Error("Revisión no encontrada");
-    actualizarContenidoArchivo(fileId, base64Data);
+    
+    const estadoRevision = registro[4]; 
+    
+    if (estadoRevision === "Aprobado" || estadoRevision === "A Corregir") {
+      throw new Error("No se puede editar una revisión finalizada.");
+    }
+
+    actualizarContenidoArchivo(fileId, base64Data); 
     
     const idArchivoV = registro[0];
     const idArchivoV1 = obtenerIdRaizDesdeVersion(idArchivoV);

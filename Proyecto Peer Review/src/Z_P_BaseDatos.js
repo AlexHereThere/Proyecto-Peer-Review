@@ -10,21 +10,21 @@ function PU_BaseDatos() {
     const nombreHoja = "Usuarios";
     
     // 1. Primera llamada (petición real a Sheets)
-    const inicio1 = performance.now();
+    const inicio1 = Date.now();
     const data1 = getSheetData(nombreHoja);
-    const fin1 = performance.now();
+    const fin1 = Date.now();
     
     assert.ok(Array.isArray(data1), "Retornó un arreglo de datos.");
     assert.ok(data1.length > 0, "La hoja Usuarios no está vacía.");
 
     // 2. Segunda llamada (debería venir de caché)
-    const inicio2 = performance.now();
+    const inicio2 = Date.now();
     const data2 = getSheetData(nombreHoja);
-    const fin2 = performance.now();
+    const fin2 = Date.now();
 
     assert.deepEqual(data1, data2, "Los datos de la caché coinciden con los originales.");
     
-    // Nota: Performance.now() puede variar, pero la caché debería ser drásticamente más rápida
+    // Nota: Date.now() puede variar, pero la caché debería ser drásticamente más rápida
     // Solo como debug, no assert estricto por variabilidad de red
     console.log(`[Test] Latencia 1 (Real): ${fin1 - inicio1}ms | Latencia 2 (Caché): ${fin2 - inicio2}ms`);
   });
