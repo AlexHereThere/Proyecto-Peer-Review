@@ -17,8 +17,12 @@ const REGISTRO_PRUEBAS = crearRastreoTest();
 function definirPruebasUnitarias() {
   const Qunit = QUnitGS2.QUnit;
 
+  PU_BaseDatos();
+  PU_ReglasNegocio();
+  PU_Utils();
   PU_Main();
   PU_LogicaNegocio();
+  PU_Admin(REGISTRO_PRUEBAS);
   PU_Revisiones(REGISTRO_PRUEBAS);
   PU_Drive(REGISTRO_PRUEBAS);
   PU_User(REGISTRO_PRUEBAS);

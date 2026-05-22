@@ -1,0 +1,85 @@
+<script>
+/**
+ * js_shared.html - Constantes y Utilidades Compartidas de UI
+ */
+
+const UI_BADGES = {
+  "Pendiente":   "bg-secondary",
+  "Asignado":    "bg-primary",
+  "En Revisión": "bg-warning text-dark",
+  "En revisión": "bg-warning text-dark",
+  "Aceptado":    "bg-primary",
+  "A Corregir":  "bg-danger",
+  "Rechazado":   "bg-danger",
+  "Aprobado":    "bg-success",
+  "Finalizado":  "bg-success"
+};
+
+const UI_TIPO_REVISION = {
+  "Abierta":      "bg-secondary text-white",
+  "Simple Ciego": "bg-primary text-white",
+  "Doble Ciego":  "bg-dark text-white"
+};
+
+const UI_ROLES = {
+  "Autor":   "bg-primary",   // Verde (#00723f)
+  "Revisor": "bg-secondary", // Oro (#dd971a)
+  "Admin":   "bg-success",   // Azul (#20419A)
+  "Editor":  "bg-info"      // Púrpura (#630df0)
+};
+
+/**
+ * Validador básico de formato de email.
+ * @param {string} email - Correo a validar.
+ * @returns {boolean} True si es válido.
+ */
+function UI_validarEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+/**
+ * Evalúa y protege identidades según modalidad de arbitraje.
+ * @param {string} tipo - Modalidad ("Doble Ciego", "Simple Ciego", "Abierta").
+ * @param {string} rolConsulta - Rol de quien consulta ("Autor", "Revisor", "Admin").
+ * @param {string} original - Identidad original (email o nombre).
+ * @param {string} sujeto - A quién pertenece la identidad ("Autor" o "Revisor").
+ * @returns {string} Identidad procesada.
+ */
+function UI_protegerIdentidad(tipo, rolConsulta, original, sujeto) {
+  const t = (tipo || "Doble Ciego").trim().toLowerCase();
+  const rol = (rolConsulta || "").trim().toLowerCase();
+  const id = (original || "Pendiente").trim();
+
+  if (rol === "admin" || t === "abierta") return id;
+
+  if (t === "simple ciego") {
+    if (sujeto === "Revisor" && rol === "autor") return "Anónimo (Revisor)";
+    return id;
+  }
+
+  if (t === "doble ciego") {
+    if (sujeto === "Revisor" && rol === "autor") return "Anónimo (Revisor)";
+    if (sujeto === "Autor" && rol === "revisor") return "Anónimo (Autor)";
+  }
+
+  return id;
+}
+
+/**
+ * Renderiza un spinner de carga en una tabla.
+ * @param {string} id - ID del tbody.
+ * @param {number} colspan - Número de columnas.
+ * @param {string} msg - Mensaje de carga.
+ */
+function UI_mostrarLoadingTabla(id, colspan, msg = "Cargando...") {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.innerHTML = `
+    <tr>
+      <td colspan="${colspan}" class="text-center text-muted py-4">
+        <div class="spinner-border spinner-border-sm text-primary me-2"></div>
+        ${msg}
+      </td>
+    </tr>`;
+}
+</script>

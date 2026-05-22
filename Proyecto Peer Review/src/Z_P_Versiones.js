@@ -40,7 +40,7 @@ function PU_Versiones(rastreo) {
     trackCarpeta(rastreo, vFolderId);
 
     // SETUP: Simular existencia de documento raíz
-    getSheet_DOC().appendRow(["USER_TEST", "Documento_Prueba", idRaiz, folderTest.getId(), vFolderId, new Date()]);
+    getSheet_DOC().appendRow([new Date(), "Documento_Prueba", idRaiz, folderTest.getId(), vFolderId, "REV_ID", "Pendiente", "USER_TEST"]);
     
     // RASTREO DB
     trackDoc(rastreo, idRaiz);
@@ -73,7 +73,7 @@ function PU_Versiones(rastreo) {
     trackCarpeta(rastreo, vFolderId);
 
     // SETUP
-    getSheet_DOC().appendRow(["U1", "Doc_Multi", idRaiz, folderTest.getId(), vFolderId, new Date()]);
+    getSheet_DOC().appendRow([new Date(), "Doc_Multi", idRaiz, folderTest.getId(), vFolderId, "REV_ID", "Pendiente", "U1"]);
     trackDoc(rastreo, idRaiz);
     trackVersion(rastreo, idRaiz);
     trackActividad(rastreo, "Doc_Multi");

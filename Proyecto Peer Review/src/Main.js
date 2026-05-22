@@ -1,48 +1,25 @@
 /**
- * Main.gs - Punto de Entrada y Configuración de Vistas
+ * Main.js - Punto de Entrada y Configuración de Vistas
  */
+
+/** @type {QUnit} Instancia de QUnit para pruebas unitarias. */
+var Qunit = QUnitGS2.QUnit;
 
 /**
- * Obtiene la instancia de la hoja de cálculo principal utilizando el ID
- * almacenado en las propiedades del script.
- * @returns {GoogleAppsScript.Spreadsheet.Spreadsheet} El objeto Spreadsheet.
+ * Obtiene los datos iniciales necesarios para arrancar la aplicación en una sola llamada.
+ * @returns {Object} Objeto con información del usuario y sus permisos/roles.
  */
-function getSpreed() {
-  const id = PropertiesService.getScriptProperties().getProperty('SHEET_ID');
-  return SpreadsheetApp.openById(id);
+function getAppData() {
+  const user = sacarGoogleInfoUsuario();
+  const perms = inicializarUsuario();
+  return { user, perms };
 }
-
-/**
- * Accede a una hoja específica dentro del Spreadsheet principal utilizando su nombre.
- * @param {string} nombre - El nombre de la pestaña/hoja (ej. "Documentos", "Usuarios").
- * @returns {GoogleAppsScript.Spreadsheet.Sheet} El objeto de la hoja solicitada.
- */
-function getSheetByName(nombre) {
-  return getSpreed().getSheetByName(nombre);
-}
-
-/** Obtiene la hoja de "Usuarios". */
-function getSheet_USR() { return getSpreed().getSheetByName("Usuarios"); }
-
-/** Obtiene la hoja de "Documentos". */
-function getSheet_DOC() { return getSpreed().getSheetByName("Documentos"); }
-
-/** Obtiene la hoja de "Versiones". */
-function getSheet_VER() { return getSpreed().getSheetByName("Versiones"); }
-
-/** Obtiene la hoja de "Revisiones". */
-function getSheet_REV() { return getSpreed().getSheetByName("Revisiones"); }
-
-/** Obtiene la hoja de "Actividad". */
-function getSheet_ACT() { return getSpreed().getSheetByName("Actividad"); }
-function getSheet_CON() { return getSpreed().getSheetByName("Configuracion"); }
-
-var Qunit = QUnitGS2.QUnit; // Pruebas Unitarias
 
 /**
  * Función principal de Google Apps Script para manejar solicitudes GET.
  * Inicializa la infraestructura del sistema, procesa acciones de correos y sirve la interfaz.
- * @returns {HtmlService.HtmlOutput} El contenido HTML configurado.
+ * @param {Object} e - Objeto de evento de la solicitud GET.
+ * @returns {GoogleAppsScript.HTML.HtmlOutput} El contenido HTML configurado.
  */
 function doGet(e) {
   // --- 1. MODO: PRUEBAS UNITARIAS ---
@@ -73,6 +50,10 @@ function doGet(e) {
   return output;
 }
 
+/**
+ * Obtiene los resultados de las pruebas desde el servidor.
+ * @returns {Object} Los resultados de QUnit.
+ */
 function getResultsFromServer() {
    return QUnitGS2.getResultsFromServer();
 }
@@ -96,6 +77,10 @@ function getVista(nombre){
   return template.evaluate().getContent();
 }
 
+/**
+ * Recarga el contenido HTML del componente sidebar.
+ * @returns {string} El contenido HTML del sidebar procesado.
+ */
 function recargarSidebarHTML() {
   return HtmlService.createTemplateFromFile('component_sidebar').evaluate().getContent();
 }

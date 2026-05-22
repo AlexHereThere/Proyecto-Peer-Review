@@ -1,5 +1,5 @@
 /**
- * Dashboard.gs - Gestión de Estadísticas y Actividad del Usuario
+ * Actividad.js - Gestión de Estadísticas y Actividad del Usuario
  */
 
 /**
@@ -9,18 +9,15 @@
 function getDashboardData() {
   const userEmail = Session.getActiveUser().getEmail();
   
-  // 1. Obtener Perfil y Roles
-  const userSheet = getSheet_USR();
-  const userData = userSheet.getDataRange().getValues();
+  // 1. Obtener Perfil y Roles (Uso de getSheetData para optimizar)
+  const userData = getSheetData("Usuarios");
   const userRow = userData.find(row => row[0] === userEmail) || [userEmail, "Usuario Nuevo", "Autor"];
   
   const rolesString = userRow[2] || "Autor";
   const misRoles = rolesString.split(',').map(r => r.trim());
 
-  // 2. Obtener datos maestros de Documentos y Revisiones
-  const docSheet = getSheet_DOC();
-  const docs = docSheet.getDataRange().getValues();
-  docs.shift(); // Remover cabecera
+  // 2. Obtener datos maestros (Uso de getSheetData para optimizar)
+  const docs = getSheetData("Documentos").slice(1);
 
   // Inicializar estructuras de estadísticas
   const stats = {
@@ -32,13 +29,11 @@ function getDashboardData() {
     admin: { pentienteRevisor: 0, aprobados: 0, enRevision: 0, totalSistema: docs.length }
   };
 
-  // --- MÉTRICAS DE AUTOR Y ADMIN (Un solo recorrido a la tabla Documentos) ---
-  for (let i = 0; i < docs.length; i++) {
-    const doc = docs[i];
+  // --- MÉTRICAS DE AUTOR Y ADMIN ---
+  docs.forEach(doc => {
     const estadoDoc = doc[6];  // Columna Estado
     const autorDoc = doc[7];   // Columna Email_Autor
 
-    // Si el usuario es Autor de este documento, acumulamos sus métricas
     if (stats.esAutor && autorDoc === userEmail) {
       if (estadoDoc === "En Revisión") stats.autor.enRevision++;
       else if (estadoDoc === "Pendiente") stats.autor.borradores++;
@@ -46,33 +41,24 @@ function getDashboardData() {
       else if (estadoDoc === "A Corregir") stats.autor.porCorregir++;
     }
 
-    // Si el usuario es Admin, acumulamos métricas globales del sistema
     if (stats.esAdmin) {
       if (estadoDoc === "Pendiente") stats.admin.pentienteRevisor++;
       else if (estadoDoc === "Aprobado") stats.admin.aprobados++;
       else if (estadoDoc === "En Revisión") stats.admin.enRevision++;
     }
-  }
+  });
 
-  // --- MÉTRICAS DE REVISOR (Escaneo a la tabla Revisiones) ---
+  // --- MÉTRICAS DE REVISOR ---
   if (stats.esRevisor) {
-    const revSheet = getSheet_REV();
-    if (revSheet) {
-      const revisiones = revSheet.getDataRange().getValues();
-      revisiones.shift(); // Remover cabecera
-      
-      for (let j = 0; j < revisiones.length; j++) {
-        const rev = revisiones[j];
-        const revisorEmail = rev[3]; // Columna Email_Revisor
-        const estadoRev = rev[4];    // Columna Estado (de la revisión)
-
-        if (revisorEmail === userEmail) {
-          if (estadoRev === "Asignado") stats.revisor.porEmpezar++;
-          else if (estadoRev === "En Revisión") stats.revisor.enProgreso++;
-          else if (estadoRev === "A Corregir" || estadoRev === "Aprobado") stats.revisor.completados++;
-        }
+    const revisiones = getSheetData("Revisiones").slice(1);
+    revisiones.forEach(rev => {
+      if (rev[3] === userEmail) { // Columna Email_Revisor
+        const estadoRev = rev[4];
+        if (estadoRev === "Asignado") stats.revisor.porEmpezar++;
+        else if (estadoRev === "En Revisión") stats.revisor.enProgreso++;
+        else if (estadoRev === "A Corregir" || estadoRev === "Aprobado") stats.revisor.completados++;
       }
-    }
+    });
   }
 
   return {
@@ -83,8 +69,8 @@ function getDashboardData() {
 }
 
 /**
- * Registra una nueva entrada de actividad en la hoja correspondiente a nombre del dueño del trabajo.
- * * @param {string} emailDueno - El correo electrónico del dueño del trabajo/propiedad.
+ * Registra una nueva entrada de actividad en la hoja correspondiente.
+ * @param {string} emailDueno - El correo electrónico del dueño del trabajo/propiedad.
  * @param {string} titulo - El título de la actividad.
  * @param {string} tipo - El tipo de categoría de la acción.
  * @param {string} detalle - Descripción detallada de lo ocurrido.
@@ -114,7 +100,7 @@ function registrarActividad(emailDueno, titulo, tipo, detalle, claseCSS, accion_
 /**
  * Obtiene las últimas 5 actividades del usuario actual, formateando la fecha
  * según la zona horaria del script.
- * * @returns {Array<Object>} Lista de objetos de actividad con formato para la interfaz.
+ * @returns {Array<Object>} Lista de objetos de actividad con formato para la interfaz.
  */
 function getRecentActivity() {
   const userEmail = Session.getActiveUser().getEmail();
@@ -143,7 +129,7 @@ function getRecentActivity() {
 /**
  * Inactiva enlaces de actividad específicos de un documento cuando este es eliminado.
  * Modifica el detalle del registro para indicar que el archivo ya no existe.
- * * @param {string} idDocumento - El ID del documento cuyos enlaces deben removerse.
+ * @param {string} idDocumento - El ID del documento cuyos enlaces deben removerse.
  */
 function limpiarEnlacesDeActividad(idDocumento) {
   try {

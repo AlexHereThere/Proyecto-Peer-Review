@@ -1,11 +1,12 @@
 /**
- * LogicaNegocio.gs - Sistema de Gestión Documental Relacional
+ * LogicaNegocio.js - Sistema de Gestión Documental Relacional
  */
 
 /**
  * Configura la infraestructura inicial del sistema: crea la hoja de cálculo de base de datos
  * y define el esquema de tablas si no existen.
  * @returns {string} El ID de la hoja de cálculo (Spreadsheet) del sistema.
+ * @throws {Error} Si PROJECT_FOLDER_ID no está configurado.
  */
 function inicializarSistema() {
   const props = PropertiesService.getScriptProperties();
@@ -61,23 +62,6 @@ function inicializarSistema() {
   props.setProperty('SHEET_ID', ss.getId());
   console.log("Sistema listo. Spreadsheet ID: " + ss.getId());
   return ss.getId();
-}
-
-/**
- * Garantiza la existencia de una hoja y sus cabeceras. Si no existe, la crea.
- * @param {GoogleAppsScript.Spreadsheet.Spreadsheet} ss - Instancia de la hoja de cálculo.
- * @param {string} nombre - Nombre de la hoja deseada.
- * @param {Array<string>} cabeceras - Lista de títulos para la primera fila.
- * @returns {GoogleAppsScript.Spreadsheet.Sheet} La hoja asegurada.
- */
-function asegurarHoja(ss, nombre, cabeceras) {
-  let sheet = ss.getSheetByName(nombre);
-  if (!sheet) {
-    sheet = ss.insertSheet(nombre);
-    sheet.getRange(1, 1, 1, cabeceras.length).setValues([cabeceras]).setFontWeight("bold");
-    sheet.setFrozenRows(1);
-  }
-  return sheet;
 }
 
 /**

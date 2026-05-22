@@ -1,5 +1,5 @@
 /**
- * @fileoverview Revisiones.gs - Orquestador centralizado del proceso de revisión.
+ * Revisiones.js - Orquestador centralizado del proceso de revisión.
  * Gestiona la asignación, estados, flujos de correo y persistencia relacional
  * sincronizando en tiempo real el estado maestro en la tabla 'Documentos'.
  */
@@ -10,6 +10,11 @@
 
 /**
  * Crea la revisión formalmente. Centraliza la lógica de copia y permisos.
+ * @param {string} idArchivoV - ID del archivo de la versión a revisar.
+ * @param {string} emailRevisor - Correo electrónico del revisor asignado.
+ * @param {string} folderRevId - ID de la carpeta donde se guardará el archivo de revisión.
+ * @param {string} [tipoRevision] - Tipo de revisión (Abierta, Simple Ciego, Doble Ciego).
+ * @returns {Object} Objeto con el estado del éxito y el ID del archivo de revisión.
  */
 function asignarRevision(idArchivoV, emailRevisor, folderRevId, tipoRevision) {
   const archivoVersion = DriveApp.getFileById(idArchivoV);
@@ -24,12 +29,12 @@ function asignarRevision(idArchivoV, emailRevisor, folderRevId, tipoRevision) {
   
   db_registrarRevision(idArchivoV, revisionId, proximaRevNum, emailRevisor, "Pendiente", tipo);
   
-  // OBTENER DUEÑO: Columna 8 -> Índice 7 (Email_Autor) | Columna 2 -> Índice 1 (Titulo_Doc)
-  const filaDoc = getSheet_DOC().getDataRange().getValues().find(row => row[2] === idArchivoV1);
+  // OBTENER DUEÑO: Optimizado con findRowInSheet
+  const filaDoc = findRowInSheet("Documentos", 2, idArchivoV1);
   const emailDueno = filaDoc ? filaDoc[7] : Session.getActiveUser().getEmail();
   const tituloDocumento = filaDoc ? filaDoc[1] : nombreDoc;
 
-  // === CORREGIDO: Estructura exacta de 6 parámetros ===
+  // Registro de actividad
   registrarActividad(
     emailDueno, 
     tituloDocumento, 
@@ -44,32 +49,12 @@ function asignarRevision(idArchivoV, emailRevisor, folderRevId, tipoRevision) {
 }
 
 /**
- * Otorga permisos de edición a un usuario en un archivo de Drive sin enviar notificación por email.
- */
-function compartirSinNotificacion(fileId, emailRevisor) {
-  try {
-    Drive.Permissions.create(
-      {
-        role: "writer",
-        type: "user",
-        emailAddress: emailRevisor
-      },
-      fileId,
-      { sendNotificationEmail: false }
-    );
-    return true;
-  } catch (e) {
-    console.error("Error al compartir sin notificación: " + e);
-    throw e;
-  }
-}
-
-/**
  * Inicia el proceso de revisión de un archivo, cambiando su estado de "Asignado" a "En Revisión".
+ * @param {string} idArchivoR - ID del archivo de la revisión.
+ * @returns {boolean} True si el estado se actualizó correctamente, false en caso contrario.
  */
 function iniciarRevision(idArchivoR) {
-  const sheet = getSheet_REV();
-  const data = sheet.getDataRange().getValues();
+  const data = getSheetData("Revisiones");
   const filaIndex = data.findIndex(row => row[1] === idArchivoR);
   if (filaIndex <= 0) return false;
   
@@ -83,11 +68,11 @@ function iniciarRevision(idArchivoR) {
   
   db_actualizarEstadoRevision(idArchivoR, "En Revisión");
 
-  const filaDoc = getSheet_DOC().getDataRange().getValues().find(row => row[2] === idArchivoV1);
+  const filaDoc = findRowInSheet("Documentos", 2, idArchivoV1);
   const emailDueno = filaDoc ? filaDoc[7] : Session.getActiveUser().getEmail();
   const tituloDocumento = filaDoc ? filaDoc[1] : "Documento en Revisión";
   
-  // === CORREGIDO: Estructura exacta de 6 parámetros ===
+  // Registro de actividad
   registrarActividad(
     emailDueno, 
     tituloDocumento, 
@@ -103,10 +88,12 @@ function iniciarRevision(idArchivoR) {
 
 /**
  * Finaliza la revisión de un archivo y actualiza el log de actividades de forma síncrona.
+ * @param {string} idArchivoR - ID del archivo de la revisión.
+ * @param {string} dictamenRevisor - El resultado de la revisión ("A Corregir" o "Aprobado").
+ * @returns {boolean} True si el proceso finaliza correctamente.
  */
 function finalizarRevision(idArchivoR, dictamenRevisor) {
-  const sheet = getSheet_REV();
-  const data = sheet.getDataRange().getValues();
+  const data = getSheetData("Revisiones");
   const filaIndex = data.findIndex(row => row[1] === idArchivoR);
   if (filaIndex <= 0) return false;
   
@@ -118,11 +105,11 @@ function finalizarRevision(idArchivoR, dictamenRevisor) {
   
   db_actualizarEstadoRevision(idArchivoR, estadoDestino);
 
-  const filaDoc = getSheet_DOC().getDataRange().getValues().find(row => row[2] === idArchivoV1);
+  const filaDoc = findRowInSheet("Documentos", 2, idArchivoV1);
   const emailDueno = filaDoc ? filaDoc[7] : Session.getActiveUser().getEmail();
   const tituloDocumento = filaDoc ? filaDoc[1] : "Documento Finalizado";
 
-  // === CORREGIDO: Estructura exacta de 6 parámetros ===
+  // Registro de actividad
   registrarActividad(
     emailDueno, 
     tituloDocumento, 
@@ -140,11 +127,17 @@ function finalizarRevision(idArchivoR, dictamenRevisor) {
 // INTERCEPTOR Y CONTROLADOR DE ESTADOS
 // ==========================================
 
+/**
+ * Cambia el estado de una revisión manejando flujos especiales como rechazos o inicios.
+ * @param {string} idArchivoR - ID del archivo de la revisión.
+ * @param {string} nuevoEstado - El nuevo estado solicitado.
+ * @returns {boolean} Resultado de la operación.
+ */
 function cambiarEstadoRevision(idArchivoR, nuevoEstado) {
   const email = Session.getActiveUser().getEmail();
   let idArchivoV = null;
 
-  const dataRevActual = getSheet_REV().getDataRange().getValues();
+  const dataRevActual = getSheetData("Revisiones");
   const filaActual = dataRevActual.find(row => row[1] === idArchivoR);
   if (!filaActual) return false;
   
@@ -159,7 +152,7 @@ function cambiarEstadoRevision(idArchivoR, nuevoEstado) {
   if (nuevoEstado === "Rechazado") { 
     nuevoEstado = "Pendiente"; 
     
-    const filaVer = getSheet_VER().getDataRange().getValues().find(row => row[1] === idArchivoV);
+    const filaVer = findRowInSheet("Versiones", 1, idArchivoV);
     const nombreDoc = filaVer ? filaVer[3] : "un documento";
     
     quitarRevisorDeVersion(idArchivoR);
@@ -189,15 +182,31 @@ function cambiarEstadoRevision(idArchivoR, nuevoEstado) {
 // CONSULTAS Y PERSISTENCIA (DB)
 // ==========================================
 
+/**
+ * Registra una nueva fila en la hoja de 'Revisiones'.
+ * @param {string} idV - ID de la versión asociada.
+ * @param {string} idR - ID del archivo de la revisión.
+ * @param {number} num - Número correlativo de revisión.
+ * @param {string} email - Correo del revisor.
+ * @param {string} estado - Estado inicial.
+ * @param {string} tipoRevision - Tipo de revisión asignado.
+ */
 function db_registrarRevision(idV, idR, num, email, estado, tipoRevision) {
-  const sheet = getSheet_REV();
+  const ss = getSpreed();
+  const sheet = ss.getSheetByName("Revisiones");
   sheet.appendRow([idV, idR, num, email, estado, new Date(), tipoRevision]);
 }
 
+/**
+ * Actualiza el campo estado de una revisión en la hoja de cálculo.
+ * @param {string} idArchivoR - ID del archivo de revisión.
+ * @param {string} nuevoEstado - El nuevo valor del estado.
+ * @returns {boolean} True si se encontró y actualizó el registro.
+ */
 function db_actualizarEstadoRevision(idArchivoR, nuevoEstado) {
-  const sheet = getSheet_REV();
-  if (!sheet) return false;
-  const data = sheet.getDataRange().getValues();
+  const ss = getSpreed();
+  const sheet = ss.getSheetByName("Revisiones");
+  const data = getSheetData("Revisiones");
   for (let i = 1; i < data.length; i++) {
     if (data[i][1] === idArchivoR) {
       sheet.getRange(i + 1, 5).setValue(nuevoEstado);
@@ -209,19 +218,15 @@ function db_actualizarEstadoRevision(idArchivoR, nuevoEstado) {
 
 /**
  * Obtiene las revisiones asignadas al usuario activo aplicando anonimato sobre el autor.
+ * @returns {Array<Object>} Lista de revisiones asignadas al usuario.
  */
 function obtenerRevisiones_Usuario() {
-  const sheetRev = getSheet_REV();
-  const sheetVer = getSheet_VER();
-  const sheetDoc = getSheet_DOC(); 
-  if (!sheetRev || !sheetVer || !sheetDoc) return [];
+  const dataRev = getSheetData("Revisiones");
+  const dataVer = getSheetData("Versiones");
+  const dataDoc = getSheetData("Documentos");
   
   const emailLogueado = Session.getActiveUser().getEmail();
   const rolUsuarioActual = "Revisor"; 
-
-  const dataRev = sheetRev.getDataRange().getValues();
-  const dataVer = sheetVer.getDataRange().getValues();
-  const dataDoc = sheetDoc.getDataRange().getValues();
 
   const mapeoVersiones = {};
   dataVer.slice(1).forEach(fila => {
@@ -256,19 +261,20 @@ function obtenerRevisiones_Usuario() {
 }
 
 /**
- * Usado por Autores o Revisores en vistas generales de un documento.
+ * Obtiene todas las revisiones de un documento específico para su visualización.
+ * @param {string} idRaiz - ID del documento raíz.
+ * @returns {Array<Object>} Lista de revisiones filtradas y sanitizadas.
  */
 function obtenerRevisionesDeDocumento(idRaiz) {
   const emailLogueado = Session.getActiveUser().getEmail();
   const rolUsuarioActual = determinarRolDeUsuarioEnDocumento(idRaiz, emailLogueado); 
   
-  // === CORREGIDO: Índice cambiado a 7 (Email_Autor) ===
-  const filaDoc = getSheet_DOC().getDataRange().getValues().find(row => row[2] === idRaiz);
+  const filaDoc = findRowInSheet("Documentos", 2, idRaiz);
   const emailAutorOriginal = filaDoc ? filaDoc[7] : "";
 
-  const idsVersiones = getSheet_VER().getDataRange().getValues().slice(1).filter(row => row[0] === idRaiz).map(row => row[1]);
+  const idsVersiones = filterRowsInSheet("Versiones", 0, idRaiz).map(row => row[1]);
   
-  return getSheet_REV().getDataRange().getValues().slice(1)
+  return getSheetData("Revisiones").slice(1)
     .filter(row => idsVersiones.includes(row[0]))
     .map(row => {
       const emailRevisorOriginal = row[3];
@@ -285,9 +291,14 @@ function obtenerRevisionesDeDocumento(idRaiz) {
     });
 }
 
+/**
+ * Obtiene las revisiones agrupadas por versión para un documento raíz.
+ * @param {string} idRaiz - ID del documento raíz.
+ * @returns {Object} Estructura con versiones, sus revisores y configuración.
+ */
 function obtenerRevisionesDeDocumentoPorVersion(idRaiz) {
-  const dataVer = getSheet_VER().getDataRange().getValues();
-  const dataRev = getSheet_REV().getDataRange().getValues();
+  const dataVer = getSheetData("Versiones");
+  const dataRev = getSheetData("Revisiones");
 
   const versiones = dataVer.slice(1).filter(row => row[0] === idRaiz).sort((a, b) => a[2] - b[2])
     .map(ver => {
@@ -304,32 +315,47 @@ function obtenerRevisionesDeDocumentoPorVersion(idRaiz) {
   return { versiones: versiones, copiarRevisores: getCopiarRevisores(idRaiz) };
 }
 
+/**
+ * Busca si ya existe una revisión asignada para un revisor en una versión.
+ * @param {string} idArchivoV - ID de la versión.
+ * @param {string} email - Correo del revisor.
+ * @returns {Array|undefined} La fila de la revisión si existe.
+ */
 function buscarRevisionExistente(idArchivoV, email) {
-  return getSheet_REV().getDataRange().getValues().slice(1).find(fila => fila[0] == idArchivoV && fila[3] == email);
+  return getSheetData("Revisiones").slice(1).find(fila => fila[0] == idArchivoV && fila[3] == email);
 }
 
+/**
+ * Obtiene el estado actual de una revisión.
+ * @param {string} idArchivoR - ID del archivo de revisión.
+ * @returns {string|null} El estado o null si no se encuentra.
+ */
 function obtenerEstadoRevision(idArchivoR) {
-  const fila = getSheet_REV().getDataRange().getValues().find(row => row[1] === idArchivoR);
+  const fila = findRowInSheet("Revisiones", 1, idArchivoR);
   return fila ? fila[4] : null;
 }
 
 /**
  * Sobrescribe el contenido de un archivo PDF con nuevos comentarios.
+ * @param {string} base64Data - El contenido del archivo en base64.
+ * @param {string} fileId - ID del archivo de revisión.
+ * @returns {boolean} True si se guarda correctamente.
+ * @throws {Error} Si la revisión no se encuentra.
  */
 function guardarComentarios(base64Data, fileId) {
   try {
-    const registro = getSheet_REV().getDataRange().getValues().find(row => row[1] === fileId);
+    const registro = findRowInSheet("Revisiones", 1, fileId);
     if (!registro) throw new Error("Revisión no encontrada");
     actualizarContenidoArchivo(fileId, base64Data);
     
     const idArchivoV = registro[0];
     const idArchivoV1 = obtenerIdRaizDesdeVersion(idArchivoV);
 
-    const filaDoc = getSheet_DOC().getDataRange().getValues().find(row => row[2] === idArchivoV1);
+    const filaDoc = findRowInSheet("Documentos", 2, idArchivoV1);
     const emailDueno = filaDoc ? filaDoc[7] : Session.getActiveUser().getEmail();
     const tituloDocumento = filaDoc ? filaDoc[1] : "Documento";
 
-    // === CORREGIDO: Estructura exacta de 6 parámetros ===
+    // Registro de actividad
     registrarActividad(
       emailDueno, 
       tituloDocumento, 
@@ -343,57 +369,4 @@ function guardarComentarios(base64Data, fileId) {
     console.error(e);
     throw e;
   }
-}
-
-function calcularSiguienteCorrelativo(folderId, nombreDoc) {
-  const versionMatch = nombreDoc.match(/^V(\d+)_/);
-  if (!versionMatch) throw new Error("Nombre sin versión válida");
-  const files = DriveApp.getFolderById(folderId).getFiles();
-  let maxRPorVersion = {};
-  while (files.hasNext()) {
-    const match = files.next().getName().match(/^R(\d+)_V(\d+)_/);
-    if (match) {
-      const r = parseInt(match[1], 10); 
-      const v = match[2];
-      if (!maxRPorVersion[v] || r > maxRPorVersion[v]) maxRPorVersion[v] = r;
-    }
-  }
-  return (maxRPorVersion[versionMatch[1]] || 0) + 1;
-}
-
-/**
- * Aplica las reglas de anonimato para revisiones (Abierta, Simple Ciego, Doble Ciego).
- */
-function obtenerIdentidadesVisibles(tipoRevision, emailAutor, emailRevisor, rolUsuarioActual) {
-  const rol = rolUsuarioActual ? rolUsuarioActual.trim().toLowerCase() : "";
-  const tipo = tipoRevision ? tipoRevision.trim().toLowerCase() : "";
-
-  if (rol === "admin") {
-    return { autor: emailAutor, revisor: emailRevisor };
-  }
-
-  let autorVisible = emailAutor;
-  let revisorVisible = emailRevisor;
-
-  switch (tipo) {
-    case "simple ciego":
-      if (rol === "autor") {
-        revisorVisible = "Anónimo (Revisor)";
-      }
-      break;
-
-    case "doble ciego":
-      if (rol === "autor") {
-        revisorVisible = "Anónimo (Revisor)";
-      } else if (rol === "revisor") { 
-        autorVisible = "Anónimo (Autor)";
-      }
-      break;
-
-    case "abierta":
-    default:
-      break;
-  }
-
-  return { autor: autorVisible, revisor: revisorVisible };
 }

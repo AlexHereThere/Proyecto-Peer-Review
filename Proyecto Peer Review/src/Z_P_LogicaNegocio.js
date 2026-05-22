@@ -19,31 +19,9 @@ function PU_LogicaNegocio() {
     // 3. ASSERTS DE CONFIGURACIÓN
     const propId = PropertiesService.getScriptProperties().getProperty('SHEET_ID');
     assert.equal(propId, id, "El ID se persistió correctamente en ScriptProperties.");
-  });
+    });
+    }
 
-  Qunit.test("asegurarHoja - Creación de pestañas", (assert) => {
-    const ss = getSpreed();
-    const nombreTest = "Hoja_Prueba_Temporal";
-    const cabs = ["Col1", "Col2"];
-    
-    // SETUP: Limpiar si existe previamente
-    const previa = ss.getSheetByName(nombreTest);
-    if (previa) ss.deleteSheet(previa);
-    
-    // EJECUCIÓN
-    const hoja = asegurarHoja(ss, nombreTest, cabs);
-    
-    // ASSERTS
-    assert.ok(hoja !== null, "La función retornó la instancia de la hoja.");
-    assert.equal(hoja.getName(), nombreTest, "El nombre de la pestaña es correcto.");
-    
-    const cabecerasReales = hoja.getRange(1, 1, 1, 2).getValues()[0];
-    assert.deepEqual(cabecerasReales, cabs, "Las cabeceras coinciden con el esquema definido.");
-    
-    // CLEANUP LOCAL
-    ss.deleteSheet(hoja);
-  });
-}
 
 /**
  * Pruebas de Integridad Relacional.

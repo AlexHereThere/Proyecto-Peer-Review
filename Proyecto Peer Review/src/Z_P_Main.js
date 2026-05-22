@@ -49,7 +49,7 @@ function PU_Main() {
     { nombre: "Usuarios", cabeceras: ["Email_Usuario", "Nombre_Usuario", "Roles", "ID_G_Carpeta", "Fecha_Registro"] },
     { nombre: "Documentos", cabeceras: ["Fecha", "Nombre_Archivo", "ID_Documento_Raiz", "ID_G_Trabajo", "ID_G_Versiones", "ID_G_Revisiones", "Estado", "Email_Autor"] },
     { nombre: "Versiones", cabeceras: ["ID_Documento_Raiz", "ID_Archivo_V", "Numero_Version", "Nombre_Archivo_V", "Fecha_Subida"] },
-    { nombre: "Revisiones", cabeceras: ["ID_Archivo_V", "ID_Archivo_R", "Numero_Revision", "Email_Revisor", "Estado", "Fecha"] },
+    { nombre: "Revisiones", cabeceras: ["ID_Archivo_V", "ID_Archivo_R", "Numero_Revision", "Email_Revisor", "Estado", "Fecha", "Tipo_Revision"] },
     { nombre: "Actividad", cabeceras: ["ID_Actividad", "Email_Usuario", "Titulo_Doc", "Tipo_Evento", "Detalle_Display", "Clase_CSS", "Fecha", "Accion_Enlace"] }
   ];
 

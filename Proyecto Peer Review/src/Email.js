@@ -1,5 +1,5 @@
 /**
- * @fileoverview Emails.gs - Servicio centralizado de mensajería y notificaciones.
+ * Email.js - Servicio centralizado de mensajería y notificaciones.
  * Aísla las plantillas HTML del flujo lógico de la aplicación con diseño UABC.
  */
 
@@ -54,6 +54,9 @@ function enviarCorreoBase_UABC(emailDestino, asunto, titulo, mensajeCuerpo, esIn
 
 /**
  * Envía una notificación cuando se asigna un revisor por primera vez. (Muestra Aceptar/Rechazar)
+ * @param {string} emailRevisor - Correo del revisor.
+ * @param {string} nombreDoc - Nombre del documento asignado.
+ * @param {string} idRevision - ID de la revisión.
  */
 function enviarNotificacion_AsignacionNueva(emailRevisor, nombreDoc, idRevision) {
   const urlApp = ScriptApp.getService().getUrl();
@@ -79,6 +82,10 @@ function enviarNotificacion_AsignacionNueva(emailRevisor, nombreDoc, idRevision)
 
 /**
  * Envía una notificación cuando se sube una nueva versión y requiere re-evaluación. (Muestra Aceptar/Rechazar)
+ * @param {string} emailRevisor - Correo del revisor.
+ * @param {string} nombreDoc - Nombre del documento.
+ * @param {number} numeroVersion - El número de la nueva versión.
+ * @param {string} idRevision - ID de la revisión.
  */
 function enviarNotificacion_NuevaVersion(emailRevisor, nombreDoc, numeroVersion, idRevision) {
   const urlApp = ScriptApp.getService().getUrl();
@@ -105,7 +112,7 @@ function enviarNotificacion_NuevaVersion(emailRevisor, nombreDoc, numeroVersion,
 }
 
 /**
- * Envía una notificación a todos los administradores cuando un revisor rechaza una asignación. (Muestra ÚNICO botón Ir a la App)
+ * Envía una notificación a todos los administradores cuando un revisor rechaza una asignación.
  * @param {string} emailRevisor - Correo del revisor que rechazó.
  * @param {string} nombreDoc - Nombre del documento en cuestión.
  */
@@ -272,6 +279,9 @@ function enviarNotificacion_ResumenDiario() {
 
 /**
  * Genera una grilla de filas HTML personalizada para el usuario o administrador.
+ * @param {Array<Object>} actividades - Lista de actividades a incluir en la tabla.
+ * @param {boolean} esAdmin - Indica si el destinatario es administrador.
+ * @returns {string} El contenido HTML de la tabla de actividades.
  */
 function generarTablaActividadPersonalHtml(actividades, esAdmin) {
   let filas = "";
@@ -314,6 +324,8 @@ function generarTablaActividadPersonalHtml(actividades, esAdmin) {
 
 /**
  * Procesa las acciones "aceptar" y "rechazar" embebidas en los correos electrónicos.
+ * @param {Object} e - Objeto de evento de la solicitud GET (Google Apps Script).
+ * @returns {GoogleAppsScript.HTML.HtmlOutput} La página HTML de respuesta.
  */
 function manejarAccionCorreo(e) {
   const params = e && e.parameter ? e.parameter : (e || {});

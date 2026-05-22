@@ -1,5 +1,5 @@
 /**
- * @fileoverview Versiones.gs - Orquestador del ciclo de vida de versiones.
+ * Versiones.js - Orquestador del ciclo de vida de versiones.
  * Controla la inserción incremental de archivos de entrega y los procesos de borrado.
  */
 
@@ -14,7 +14,7 @@
  * @param {string} idArchivoV - ID del archivo físico de esta versión específica.
  * @param {number} numVersion - Número de versión (ej. 1, 2, 3).
  * @param {string} nombreV - Nombre asignado a esta versión.
- * @return {number} - Número de la última fila insertada.
+ * @returns {number} Número de la última fila insertada.
  */
 function registrarVersion(idDocRaiz, idArchivoV, numVersion, nombreV) {
   const sheet = getSheet_VER();
@@ -28,7 +28,8 @@ function registrarVersion(idDocRaiz, idArchivoV, numVersion, nombreV) {
  * Al subirse, queda limpia de revisores hasta que el Administrador los asigne manualmente.
  * @param {string} versionesFolderId - ID de la carpeta de versiones del proyecto.
  * @param {string} base64Data - Nuevos datos del PDF en Base64.
- * @return {Object} - Objeto con el estado de éxito, número de versión e ID del archivo.
+ * @returns {Object} Objeto con el estado de éxito, número de versión e ID del archivo.
+ * @throws {Error} Si no se encuentra el registro del documento o falla la subida.
  */
 function subirNuevaVersionServidor(versionesFolderId, base64Data) {
   try {
@@ -49,13 +50,7 @@ function subirNuevaVersionServidor(versionesFolderId, base64Data) {
     // Registrar la nueva versión física en la BD
     registrarVersion(datos_doc.idOriginal, idArchivo, nuevoNumero, nuevoNombre);
     
-    // === ALINEACIÓN CON LAS COLUMNAS DE LA TABLA ACTIVIDAD ===
-    // 1. Email_Usuario  -> datos_doc.emailAutor (o .autor)
-    // 2. Titulo_Doc     -> datos_doc.nombre
-    // 3. Tipo_Evento    -> "EntregaActualizada"
-    // 4. Detalle_Display-> `Subida Versión X...`
-    // 5. Clase_CSS      -> "text-primary"
-    // 6. Accion_Enlace  -> `abrirDocumento('...')`
+    // Registro de actividad
     const correoAutor = datos_doc.emailAutor || datos_doc.autor || Session.getActiveUser().getEmail();
 
     registrarActividad(
@@ -84,6 +79,10 @@ function subirNuevaVersionServidor(versionesFolderId, base64Data) {
 
 /**
  * Gestiona la eliminación de versiones. Si es la única versión, elimina el proyecto completo.
+ * @param {string} versionesFolderId - ID de la carpeta de versiones del proyecto.
+ * @param {number} numeroVersion - El número de versión a eliminar.
+ * @returns {Object} Objeto indicando si la eliminación fue completa o parcial.
+ * @throws {Error} Si no se encuentra el registro maestro del documento.
  */
 function eliminarVersionServidor(versionesFolderId, numeroVersion) {
   const sheetDoc = getSheet_DOC();
@@ -122,7 +121,7 @@ function eliminarVersionServidor(versionesFolderId, numeroVersion) {
       console.warn("La carpeta ya no existía en Drive o no se pudo mover a la papelera.");
     }
 
-    // === ALINEACIÓN CASO A ===
+    // Registro de actividad para borrado total
     registrarActividad(
       emailAutorDoc,          // emailDueno (Columna Email_Usuario)
       nombreDoc,              // titulo     (Columna Titulo_Doc)
@@ -153,7 +152,7 @@ function eliminarVersionServidor(versionesFolderId, numeroVersion) {
       
       limpiarEnlacesDeActividad(idArchivoAEliminar);
       
-      // === ALINEACIÓN CASO B ===
+      // Registro de actividad para borrado parcial
       registrarActividad(
         emailAutorDoc,             // emailDueno
         nombreDoc,                 // titulo

@@ -1,0 +1,302 @@
+<script>
+/**
+ * js_admin_revisores.html - Lógica de Asignación de Revisores y Gestión de Versiones (Admin)
+ */
+
+let docSeleccionadoAdmin = null;
+let versionSeleccionadaAdmin = null;
+
+/**
+ * Abre el modal de asignación y carga los datos del documento.
+ */
+function abrirModalAsignar(idRaiz, nombre, versionesId, revisionesId) {
+  docSeleccionadoAdmin = { idRaiz, nombre, versionesId, revisionesId };
+
+  const tabsEl   = document.getElementById("tabsVersionesAdmin");
+  const listaEl  = document.getElementById("listaRevisoresAsignados");
+  const emailEl  = document.getElementById("emailRevisorAdmin");
+  const msgEl    = document.getElementById("msgAsignarAdmin");
+  const nombreEl = document.getElementById("nombreDocAsignar");
+
+  if (nombreEl) nombreEl.textContent = nombre;
+  if (emailEl)  emailEl.value = "";
+  if (msgEl)    msgEl.textContent = "";
+  if (tabsEl)   tabsEl.innerHTML = `<li class="nav-item"><span class="nav-link disabled">Cargando...</span></li>`;
+  if (listaEl)  listaEl.innerHTML = `<div class="text-center py-2"><div class="spinner-border spinner-border-sm"></div></div>`;
+
+  new bootstrap.Modal(document.getElementById("modalAsignar")).show();
+
+  google.script.run
+    .withSuccessHandler(renderVersionesTabs)
+    .withFailureHandler(() => {
+      if (listaEl) listaEl.innerHTML = `<p class="text-danger small mb-0">Error al cargar revisores.</p>`;
+    })
+    .obtenerRevisionesDeDocumentoPorVersion(idRaiz);
+
+  cargarRevisoresSistema();
+}
+
+/**
+ * Renderiza las pestañas de versiones dentro del modal.
+ */
+function renderVersionesTabs(data) {
+  const tabsEl = document.getElementById("tabsVersionesAdmin");
+  const listaEl = document.getElementById("listaRevisoresAsignados");
+  if (!tabsEl || !listaEl) return;
+
+  const versiones = Array.isArray(data) ? data : (data.versiones || []);
+  window._versionesAdmin = versiones;
+
+  if (!versiones || versiones.length === 0) {
+    tabsEl.innerHTML = `<li class="nav-item"><span class="nav-link disabled">Sin versiones</span></li>`;
+    listaEl.innerHTML = `<p class="text-muted small mb-0">Sin revisores asignados aún.</p>`;
+    return;
+  }
+
+  tabsEl.innerHTML = versiones.map((ver, i) => `
+    <li class="nav-item">
+      <a class="nav-link ${i === 0 ? 'active' : ''}" href="#"
+         onclick="seleccionarVersionAdmin(${i}); return false;">
+        V${ver.numero}
+      </a>
+    </li>
+  `).join("");
+
+  seleccionarVersionAdmin(0);
+}
+
+/**
+ * Gestiona la selección de una versión específica en el modal.
+ */
+function seleccionarVersionAdmin(index) {
+  const versiones = window._versionesAdmin || [];
+  if (!versiones[index]) return;
+
+  versionSeleccionadaAdmin = versiones[index];
+
+  const links = document.querySelectorAll("#tabsVersionesAdmin .nav-link");
+  links.forEach((link, i) => link.classList.toggle("active", i === index));
+
+  const listaEl = document.getElementById("listaRevisoresAsignados");
+  if (!listaEl) return;
+
+  const { revisores } = versionSeleccionadaAdmin;
+
+  if (!revisores || revisores.length === 0) {
+    listaEl.innerHTML = `<p class="text-muted small mb-0 p-2">Sin revisores en esta versión.</p>`;
+    return;
+  }
+
+  listaEl.innerHTML = revisores.map(rev => {
+    const badgeTipo = UI_TIPO_REVISION[rev.tipoRevision] || "bg-light text-dark";
+    const badgeEstado = UI_BADGES[rev.estado] || "bg-secondary";
+    return `
+      <div class="d-flex justify-content-between align-items-center py-1 border-bottom px-1">
+        <div class="d-flex flex-column" style="max-width: 60%;">
+          <span class="small text-truncate fw-semibold" title="${rev.emailRevisor}">
+            ${rev.emailRevisor}
+          </span>
+          <span class="badge ${badgeTipo} align-self-start mt-1" style="font-size: 0.65rem; padding: 2px 6px;">
+            ${rev.tipoRevision || 'No definido'}
+          </span>
+        </div>
+        <div class="d-flex align-items-center gap-1">
+          <span class="badge ${badgeEstado} rounded-pill" style="font-size: 0.75rem;">${rev.estado}</span>
+          ${rev.estado === "Pendiente" ? `
+            <button class="btn btn-xs btn-outline-danger p-1 d-flex align-items-center justify-content-center" 
+                    onclick="quitarRevisor('${rev.idArchivoR}')"
+                    title="Quitar revisor"
+                    style="width: 24px; height: 24px;">
+              X
+            </button>` : ''}
+        </div>
+      </div>`;
+  }).join("");
+}
+
+/**
+ * Elimina un revisor de una versión.
+ */
+function quitarRevisor(idArchivoR) {
+  const msg = document.getElementById("msgAsignarAdmin");
+  if (msg) {
+    msg.className = "mt-2 small fw-bold text-info";
+    msg.textContent = "Eliminando revisor...";
+  }
+
+  google.script.run
+    .withSuccessHandler(() => {
+      if (msg) {
+        msg.className = "mt-2 small fw-bold text-success";
+        msg.textContent = "Revisor eliminado correctamente.";
+      }
+      cargarAdmin(); 
+      google.script.run
+        .withSuccessHandler(renderVersionesTabs)
+        .obtenerRevisionesDeDocumentoPorVersion(docSeleccionadoAdmin.idRaiz);
+    })
+    .withFailureHandler(err => {
+      if (msg) {
+        msg.className = "mt-2 small fw-bold text-danger";
+        msg.textContent = "Error: " + err.message;
+      }
+    })
+    .quitarRevisorDeVersion(idArchivoR);
+}
+
+/**
+ * Procesa la asignación manual de un revisor.
+ */
+function confirmarAsignacion() {
+  const btn = document.getElementById("btnConfirmarAsignar");
+  const msg = document.getElementById("msgAsignarAdmin");
+  const emailInput = document.getElementById("emailRevisorAdmin");
+  
+  if (!emailInput || !btn || !msg) return;
+
+  const email = emailInput.value.trim();
+  if (!UI_validarEmail(email)) {
+    msg.className = "mt-2 small fw-bold text-danger";
+    msg.textContent = "Por favor, introduce un correo electrónico válido.";
+    return;
+  }
+
+  let tipoRevisionSeleccionado = document.getElementById("tipoRevisionCorreoAdmin")?.value || "Doble Ciego";
+
+  btn.disabled = true;
+  const textoOriginalBtn = btn.innerHTML;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+
+  google.script.run
+    .withSuccessHandler(() => {
+      btn.disabled = false;
+      btn.innerHTML = textoOriginalBtn;
+      emailInput.value = "";
+      msg.className = "mt-2 small fw-bold text-success";
+      msg.textContent = "¡Revisor asignado exitosamente!";
+      cargarAdmin();
+      google.script.run
+        .withSuccessHandler(renderVersionesTabs)
+        .obtenerRevisionesDeDocumentoPorVersion(docSeleccionadoAdmin.idRaiz);
+    })
+    .withFailureHandler(err => {
+      btn.disabled = false;
+      btn.innerHTML = textoOriginalBtn;
+      msg.className = "mt-2 small fw-bold text-danger";
+      msg.textContent = "Error: " + err.message;
+    })
+    .asignarRevisorDesdeAdmin(docSeleccionadoAdmin.idRaiz, email, docSeleccionadoAdmin.revisionesId, tipoRevisionSeleccionado);
+}
+
+/**
+ * Obtiene la lista de revisores del sistema para selección rápida.
+ */
+function cargarRevisoresSistema() {
+  const listaEl = document.getElementById("listaRevisoresSistema");
+  if (!listaEl) return;
+
+  google.script.run
+    .withSuccessHandler(data => {
+      if (!data || data.length === 0) {
+        listaEl.innerHTML = `<p class="text-muted small mb-0 p-1">No hay revisores registrados.</p>`;
+        return;
+      }
+      listaEl.innerHTML = data.map(rev => `
+        <div class="d-flex justify-content-between align-items-center py-1 border-bottom px-1">
+          <div style="max-width: 70%;">
+            <div class="small fw-semibold text-truncate">${rev.nombre}</div>
+            <div class="text-muted" style="font-size:0.75rem;">${rev.email}</div>
+          </div>
+          <button class="btn btn-sm btn-outline-primary"
+                  onclick="asignarDesdeListaSistema(this, '${rev.email}')">
+            Asignar
+          </button>
+        </div>
+      `).join("");
+    })
+    .withFailureHandler(() => {
+      listaEl.innerHTML = `<p class="text-danger small mb-0">Error al cargar lista del sistema.</p>`;
+    })
+    .obtenerRevisoresDelSistema();
+}
+
+/**
+ * Asigna un revisor desde la lista predefinida del sistema.
+ */
+function asignarDesdeListaSistema(btn, email) {
+  const msg = document.getElementById("msgAsignarAdmin");
+  const tipoRevision = document.getElementById("tipoRevisionListaAdmin")?.value || "Doble Ciego";
+
+  if (!docSeleccionadoAdmin) return;
+
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+  }
+
+  google.script.run
+    .withSuccessHandler(res => {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = "Asignar";
+      }
+      if (res && res.success) {
+        if (msg) {
+          msg.className = "mt-2 small fw-bold text-success";
+          msg.textContent = `¡${email} asignado con éxito!`;
+        }
+        cargarAdmin();
+        google.script.run
+          .withSuccessHandler(renderVersionesTabs)
+          .obtenerRevisionesDeDocumentoPorVersion(docSeleccionadoAdmin.idRaiz);
+      }
+    })
+    .withFailureHandler(err => {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = "Asignar";
+      }
+      if (msg) {
+        msg.className = "mt-2 small fw-bold text-danger";
+        msg.textContent = "Error: " + err.message;
+      }
+    })
+    .asignarRevisorDesdeAdmin(docSeleccionadoAdmin.idRaiz, email, docSeleccionadoAdmin.revisionesId, tipoRevision);
+}
+
+/**
+ * Guarda la configuración de copiado automático de revisores.
+ */
+function guardarCopiarRevisores() {
+  const checkEl = document.getElementById("checkCopiarRevisores");
+  if (!checkEl || !docSeleccionadoAdmin) return;
+
+  google.script.run.setCopiarRevisores(docSeleccionadoAdmin.idRaiz, checkEl.checked);
+
+  if (checkEl.checked) {
+    const msg = document.getElementById("msgAsignarAdmin");
+    if (msg) {
+      msg.className = "mt-2 small fw-bold text-info";
+      msg.textContent = "Copiando revisores de V1...";
+    }
+
+    google.script.run
+      .withSuccessHandler(res => {
+        if (msg) {
+          msg.className = "mt-2 small fw-bold text-success";
+          msg.textContent = res.mensaje;
+        }
+        google.script.run
+          .withSuccessHandler(renderVersionesTabs)
+          .obtenerRevisionesDeDocumentoPorVersion(docSeleccionadoAdmin.idRaiz);
+      })
+      .withFailureHandler(err => {
+        if (msg) {
+          msg.className = "mt-2 small fw-bold text-danger";
+          msg.textContent = "Error: " + err.message;
+        }
+      })
+      .copiarRevisoresV1AVersionActual(docSeleccionadoAdmin.idRaiz, docSeleccionadoAdmin.revisionesId);
+  }
+}
+</script>

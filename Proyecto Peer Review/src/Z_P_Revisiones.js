@@ -9,7 +9,7 @@ function PU_Revisiones(rastreo) {
    * Registra una revisión y la añade al rastreo de limpieza.
    */
   const registrarRevision_T = (idV, idR, num, email) => {
-    db_registrarRevision(idV, idR, num, email);
+    db_registrarRevision(idV, idR, num, email, "Pendiente", "Doble Ciego");
     SpreadsheetApp.flush();
     trackRevision(rastreo, idR);
   };

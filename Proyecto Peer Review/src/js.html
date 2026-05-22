@@ -7,18 +7,40 @@
 
 // --- CARGA E INICIALIZACIÓN INICIAL ---
 window.addEventListener("load", () => {
-  // 1. Cargar datos básicos del perfil de Google (Nombre, foto, email)
-  cargarUsuario();
+  // Combinamos la carga de usuario y permisos en una sola llamada al servidor
+  google.script.run
+    .withSuccessHandler(data => {
+      // 1. Sincronizar Info de Perfil
+      const { user, perms } = data;
+      const nameEl  = document.getElementById("userName");
+      const photoEl = document.getElementById("userPhoto");
+      if (nameEl)  nameEl.innerText = user.name;
+      if (photoEl) photoEl.src = user.photo;
+      window._emailActual = user.email;
 
-  // 2. Evaluar permisos en el servidor y configurar botones del Sidebar
-  actualizarPermisosYBotonesUI((res) => {
-    // Este callback solo se ejecuta una vez al encender la aplicación por primera vez
-    if (res.esAdmin) {
-      cargarVista("page_admin");
-    } else {
-      cargarVista("page_home");
-    }
-  });
+      // 2. Sincronizar Permisos y UI
+      window.esAdmin   = perms.esAdmin;
+      window.esRevisor = perms.esRevisor;
+      window.esAutor   = perms.esAutor;
+
+      const btnAdmin = document.getElementById("btnAdmin");
+      if (btnAdmin) btnAdmin.style.display = perms.esAdmin ? "block" : "none";
+
+      const btnRevisiones = document.getElementById("btnRevisiones");
+      if (btnRevisiones) btnRevisiones.style.display = perms.esRevisor ? "block" : "none";
+
+      const btnDocumentos = document.getElementById("btnDocumentos");
+      if (btnDocumentos) btnDocumentos.style.display = perms.esAutor ? "block" : "none";
+
+      // 3. Cargar Vista Inicial
+      if (perms.esAdmin) {
+        cargarVista("page_admin");
+      } else {
+        cargarVista("page_home");
+      }
+    })
+    .withFailureHandler(err => console.error("Error crítico al inicializar aplicación:", err))
+    .getAppData();
 });
 
 /**
@@ -51,25 +73,6 @@ function actualizarPermisosYBotonesUI(callback) {
     })
     .withFailureHandler(err => console.error("Error al actualizar los permisos y botones de la interfaz:", err))
     .inicializarUsuario();
-}
-
-/**
- * Obtiene la información del perfil del usuario (Nombre, Foto de perfil y Email)
- */
-function cargarUsuario() {
-  google.script.run
-    .withSuccessHandler(user => {
-      const nameEl  = document.getElementById("userName");
-      const photoEl = document.getElementById("userPhoto");
-      
-      if (nameEl)  nameEl.innerText = user.name;
-      if (photoEl) photoEl.src = user.photo;
-      
-      // Guardar el correo electrónico del usuario de manera global
-      window._emailActual = user.email;
-    })
-    .withFailureHandler(err => console.error("Error al obtener la información de perfil del usuario:", err))
-    .sacarGoogleInfoUsuario();
 }
 
 // --- SISTEMA DE ENRUTAMIENTO Y VISTAS ASÍNCRONAS ---

@@ -27,16 +27,17 @@ function PU_Documentos(rastreo) {
       Utilities.sleep(500);
 
       // VALIDACIÓN Y RASTREO
-      const sheetDoc = getSheet_DOC();
-      const ultimaFila = sheetDoc.getLastRow();
-      const datosDoc = sheetDoc.getRange(ultimaFila, 1, 1, 8).getValues()[0];
-      const idRaiz = datosDoc[2];
-
-      trackDoc(rastreo, idRaiz);
-      trackVersion(rastreo, idRaiz);
-      trackActividad(rastreo, nombreDoc);
-
-      assert.equal(datosDoc[1], nombreDoc, "Nombre del documento verificado en BD.");
+      SpreadsheetApp.flush();
+      const datosDoc = findRowInSheet("Documentos", 1, nombreDoc);
+      assert.ok(datosDoc, "Documento localizado en BD por nombre.");
+      
+      if (datosDoc) {
+        const idRaiz = datosDoc[2];
+        trackDoc(rastreo, idRaiz);
+        trackVersion(rastreo, idRaiz);
+        trackActividad(rastreo, nombreDoc);
+        assert.equal(datosDoc[1], nombreDoc, "Nombre del documento verificado.");
+      }
 
     } catch (e) {
       assert.ok(false, `ERROR: ${e.message} | En: ${e.stack}`);

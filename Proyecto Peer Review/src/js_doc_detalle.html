@@ -1,78 +1,51 @@
-d<script>
+<script>
 /**
  * js_doc_detalle.html - Gestión de Versiones y Revisiones (Vista del Autor)
  */
 
 // --- 1. VARIABLES GLOBALES ---
 
-/** @type {Array<Object>} Lista de versiones obtenidas del servidor */
 let versiones = [];
-/** @type {Object|null} Referencia a la versión seleccionada actualmente */
 let versionActual = null;
-/** @type {string|null} ID del documento maestro */
 let idDocumentoRaiz = null;
-/** @type {string|null} ID de la carpeta de Drive para versiones */
 let versionesFolderId = null;
-/** @type {string|null} ID de la carpeta de Drive para revisiones */
 let revisionesFolderId = null;
 
 // --- 2. INICIALIZACIÓN ---
 
-/**
- * Orquestador inicial que recupera el ID del documento activo y prepara la interfaz.
- */
 function cargarDetalle() {
   const idDocOriginal = window.ID_DOCUMENTO_ACTUAL;
-  if (!idDocOriginal) {
-    console.error("No hay ID_DOCUMENTO_ACTUAL");
-    return cargarVista("page_documentos");
-  }
+  if (!idDocOriginal) return cargarVista("page_documentos");
+  
   idDocumentoRaiz = idDocOriginal;
-  if (typeof esperarElemento === "function") {
-    esperarElemento("previewPDF").then(() => cargarDetalleDocumento());
-  } else {
-    cargarDetalleDocumento();
-  }
+  esperarElemento("previewPDF").then(() => cargarDetalleDocumento());
 }
 
-/**
- * Realiza la llamada al servidor para obtener el objeto jerárquico del documento.
- */
 function cargarDetalleDocumento() {
   google.script.run
     .withSuccessHandler(renderDetalle)
     .withFailureHandler(err => {
-      console.error("Error en servidor:", err);
-      alert("Error al cargar el documento: " + err.message);
+      alert("Error: " + err.message);
     })
     .obtenerDetalleDocumento(idDocumentoRaiz);
 }
 
 // --- 3. RENDERIZADO DE INTERFAZ (UI) ---
 
-/**
- * Procesa los datos del servidor y distribuye la información en los componentes.
- */
 function renderDetalle(data) {
-  if (!data) {
-    alert("El documento solicitado no existe o no tienes permisos.");
-    return cargarVista("page_documentos");
-  }
+  if (!data) return cargarVista("page_documentos");
+
   const titulo = document.getElementById("tituloProyecto");
   if (titulo) titulo.innerText = data.nombre || "Sin título";
+  
   versiones = data.versiones || [];
   if (data.carpetas) {
     versionesFolderId = data.carpetas.versiones || null;
     revisionesFolderId = data.carpetas.revisiones || null;
-  } else {
-    console.warn("No se recibieron IDs de carpetas del servidor.");
   }
   renderTabsVersiones();
 }
 
-/**
- * Genera dinámicamente las pestañas para navegar entre las versiones del documento.
- */
 function renderTabsVersiones() {
   const cont = document.getElementById("tabsVersiones");
   if (!cont) return;
@@ -80,7 +53,6 @@ function renderTabsVersiones() {
     cont.innerHTML = '<li class="nav-item"><span class="nav-link disabled">Sin versiones</span></li>';
     return;
   }
-  // Mapear las pestañas ordenadas cronológicamente
   cont.innerHTML = versiones.map((ver, i) => `
     <li class="nav-item">
       <a class="nav-link ${i === 0 ? 'active' : ''}" href="#" onclick="seleccionarVersion(${i}); return false;">
@@ -91,85 +63,25 @@ function renderTabsVersiones() {
   seleccionarVersion(0);
 }
 
-/**
- * REPLICA LOCAL OPTIMIZADA: Evalúa las identidades visibles según la modalidad de arbitraje.
- * CORREGIDO: Uso de .toLowerCase() y .trim() para evitar falsos negativos en la comparación del tipo.
- * @param {string} tipo - Modalidad ("Doble Ciego", "Simple Ciego", "Abierta")
- * @param {string} rolConsulta - Quién está consultando (En esta vista, siempre "Autor")
- * @param {string} revisor - Nombre o correo del revisor original
- * @returns {Object} Identidad procesada
- */
-function obtenerIdentidadesVisiblesCliente(tipo, rolConsulta, revisor) {
-  const tipoLimpio = (tipo || "Doble Ciego").trim().toLowerCase();
-  const revisorOriginal = (revisor || "").trim();
-  const revisorMinuscula = revisorOriginal.toLowerCase();
-
-  // 1. Si la modalidad es Abierta, el autor SIEMPRE tiene permitido ver al revisor asignado
-  if (tipoLimpio === "abierta") {
-    if (!revisorOriginal || revisorMinuscula === "pendiente") {
-      return { revisor: "Pendiente" };
-    }
-    return { revisor: revisorOriginal }; 
-  }
-
-  // 2. Si es Ciego, protegemos la identidad sin importar lo que contenga la variable revisor
-  if (tipoLimpio === "simple ciego" || tipoLimpio === "doble ciego") {
-    if (!revisorOriginal || revisorMinuscula === "pendiente") {
-      return { revisor: "Pendiente" };
-    }
-    return { revisor: "Anónimo (Revisor)" };
-  }
-
-  // Respaldo de seguridad por defecto
-  return { revisor: "Anónimo (Revisor)" };
-}
-
-/**
- * Renderiza la tabla de revisiones asociada a la versión seleccionada.
- * Incluye un estado de carga intermedio y validación de vacíos estética.
- * @param {Array<Object>} revs - Lista de revisiones.
- */
 function renderRevisionesVersion(revs) {
   const tbody = document.getElementById("tablaRevisiones");
   if (!tbody) return;
   
   if (!revs || revs.length === 0) {
-    tbody.innerHTML = `
-      <tr>
-        <td colspan="5" class="text-center py-4 bg-body-tertiary rounded-bottom border-top-0">
-          <div class="py-2">
-            <i class="bi bi-file-earmark-lock2 text-body-secondary display-6 d-block mb-2"></i>
-            <span class="fw-semibold text-body">No se encontraron revisiones</span><br>
-            <small class="text-muted d-block mt-1">Aún no se han asignado dictaminadores para evaluar esta versión.</small>
-          </div>
-        </td>
-      </tr>`;
+    tbody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-muted small">Aún no se han asignado dictaminadores.</td></tr>`;
     return;
   }
   
   tbody.innerHTML = revs.map(r => {
-    const tipoRevision = r.tipoRevision || "Doble Ciego";
-
-    // Obtenemos la identidad procesada mediante la función blindada
-    const identidades = obtenerIdentidadesVisiblesCliente(
-      tipoRevision, 
-      "Autor", 
-      r.revisor || "Pendiente"
-    );
-
-    const badge = BADGE_ESTADO_REV[r.estado] || "bg-secondary";
-    let revisorVisual = identidades.revisor;
-    
-    // CORREGIDO: Solo forzar el tag explicativo si la función determinó que debe ser oculto
-    if (revisorVisual === "Anónimo (Revisor)") {
-      revisorVisual = `Anónimo (${tipoRevision})`;
-    }
+    const tipo = r.tipoRevision || "Doble Ciego";
+    const revisorVisual = UI_protegerIdentidad(tipo, "Autor", r.revisor, "Revisor");
+    const badge = UI_BADGES[r.estado] || "bg-secondary";
 
     return `
       <tr>
         <td class="fw-bold align-middle">R${r.numero}</td>
         <td class="align-middle">
-          <i class="bi ${(tipoRevision.toLowerCase().trim() === 'abierta') ? 'bi-person-check' : 'bi-eye-slash-fill text-muted'} me-1"></i>
+          <i class="bi ${(tipo.toLowerCase() === 'abierta') ? 'bi-person-check' : 'bi-eye-slash-fill text-muted'} me-1"></i>
           ${revisorVisual}
         </td>
         <td class="align-middle">
@@ -183,7 +95,7 @@ function renderRevisionesVersion(revs) {
             <button class="btn btn-sm btn-outline-primary shadow-sm" onclick="abrirObservacionesAutor('${r.fileId}', 'Revision R${r.numero}')">
               <i class="bi bi-eye"></i> Ver observaciones
             </button> ` : `
-            <button class="btn btn-sm btn-outline-secondary border-dashed" disabled title="Evaluación en progreso">
+            <button class="btn btn-sm btn-outline-secondary border-dashed" disabled>
               <i class="bi bi-hourglass-split"></i> En espera
             </button>
           `}
@@ -194,188 +106,103 @@ function renderRevisionesVersion(revs) {
 
 // --- 4. ACCIONES DE USUARIO ---
 
-/**
- * Actualiza la versión activa en pantalla y refresca la previsualización y revisiones.
- * Integra Throbber intermedio para evitar transiciones toscas en el DOM.
- */
 function seleccionarVersion(index) {
   if (!versiones[index]) return;
   versionActual = versiones[index];
   
-  // INYECTADO: Throbber de carga intermedio para la sección de revisiones
-  const tbody = document.getElementById("tablaRevisiones");
-  if (tbody) {
-    tbody.innerHTML = `
-      <tr>
-        <td colspan="5" class="text-center text-muted py-4">
-          <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
-          Consultando dictámenes de la versión...
-        </td>
-      </tr>`;
-  }
-
-  // Carga asíncrona del Canvas/Imagen PDF
+  UI_mostrarLoadingTabla("tablaRevisiones", 5, "Consultando dictámenes...");
   cargarPreview(versionActual.fileId);
   
-  // Pequeña microtarea para permitir que el Throbber se pinte antes de renderizar los datos
   setTimeout(() => {
     renderRevisionesVersion(versionActual.revisiones);
-  }, 180);
+  }, 200);
 
   const links = document.querySelectorAll("#tabsVersiones .nav-link");
-  links.forEach((link, i) => {
-    link.classList.toggle("active", i === index);
-  });
+  links.forEach((link, i) => { link.classList.toggle("active", i === index); });
 }
 
-/**
- * Carga una miniatura del PDF desde Drive o muestra acceso directo si falla.
- */
 function cargarPreview(fileId) {
   const preview = document.getElementById("previewPDF");
   if (!preview) return;
   if (!fileId) {
-    preview.innerHTML = '<div class="alert alert-warning">Archivo no encontrado en Drive.</div>';
+    preview.innerHTML = '<div class="alert alert-warning">Archivo no encontrado.</div>';
     return;
   }
-  preview.innerHTML = `
-    <div class="d-flex justify-content-center align-items-center" style="height: 300px;">
-      <div class="spinner-border text-primary" role="status"></div>
-    </div>`;
+  preview.innerHTML = `<div class="d-flex justify-content-center align-items-center" style="height: 200px;"><div class="spinner-border text-primary"></div></div>`;
+  
   const url = 'https://drive.google.com/thumbnail?id=' + fileId + '&sz=w1000';
   const img = new Image();
   img.onload = () => {
     preview.innerHTML = `<img src="${url}" class="img-fluid rounded shadow-sm border" style="max-height: 550px; width: 100%; object-fit: contain;">`;
   };
   img.onerror = () => {
-    preview.innerHTML = `<div class="alert alert-light text-center border py-5">
-      <i class="bi bi-file-pdf display-4 text-muted"></i><br>
-      Previsualización no disponible aún.<br>
-      <a href="https://drive.google.com/file/d/${fileId}/view" target="_blank" class="btn btn-primary mt-2">Abrir directamente</a>
-    </div>`;
+    preview.innerHTML = `<div class="alert alert-light text-center border py-5">Previsualización no disponible. <a href="https://drive.google.com/file/d/${fileId}/view" target="_blank" class="btn btn-primary btn-sm mt-2">Abrir en Drive</a></div>`;
   };
   img.src = url;
 }
 
-/**
- * Abre el archivo seleccionado en una nueva pestaña de Google Drive.
- */
 function abrirVersion() {
-  if (!versionActual || !versionActual.fileId) {
-    alert("Por favor, selecciona una versión válida.");
-    return;
-  }
-  window.open("https://drive.google.com/file/d/" + versionActual.fileId + "/view", '_blank');
+  if (versionActual?.fileId) window.open("https://drive.google.com/file/d/" + versionActual.fileId + "/view", '_blank');
 }
 
-/**
- * Muestra el modal de confirmación antes de proceder con la eliminación.
- */
 function eliminarVersion() {
-  if (!versionActual) {
-    alert("No hay una versión seleccionada para eliminar.");
-    return;
-  }
-  const modalElem = document.getElementById('modalConfirmarEliminar');
-  const instanciaModal = new bootstrap.Modal(modalElem);
-  instanciaModal.show();
-  const btnConfirmar = document.getElementById('btnConfirmarEliminarDoc');
-  btnConfirmar.onclick = () => ejecutarEliminacionVersion(instanciaModal);
+  if (!versionActual) return;
+  const modal = new bootstrap.Modal(document.getElementById('modalConfirmarEliminar'));
+  modal.show();
+  document.getElementById('btnConfirmarEliminarDoc').onclick = () => ejecutarEliminacionVersion(modal);
 }
 
 // --- 5. ELIMINACIÓN Y SUBIDA ---
 
-/**
- * Ejecuta la llamada al servidor para eliminar la versión física y lógica.
- */
 function ejecutarEliminacionVersion(instanciaModal) {
-  const statusArea = document.getElementById("statusEliminar");
-  const btnConfirmar = document.getElementById("btnConfirmarEliminarDoc");
-  if (!versionesFolderId) return alert("Error: ID de carpeta no encontrado.");
-  toggleUIState([btnConfirmar], statusArea, true);
+  const btn = document.getElementById("btnConfirmarEliminarDoc");
+  const status = document.getElementById("statusEliminar");
+  
+  btn.disabled = true;
+  if (status) status.classList.remove("d-none");
+
   google.script.run
     .withSuccessHandler(res => {
       instanciaModal.hide();
-      toggleUIState([btnConfirmar], statusArea, false);
       res.eliminadoCompleto ? cargarVista("page_documentos") : cargarDetalleDocumento();
     })
     .withFailureHandler(err => {
-      toggleUIState([btnConfirmar], statusArea, false);
+      btn.disabled = false;
+      if (status) status.classList.add("d-none");
       alert("Error: " + err.message);
     })
     .eliminarVersionServidor(versionesFolderId, versionActual.numero);
 }
 
-/**
- * Lee el archivo seleccionado y lo envía al servidor como Base64.
- */
 async function procesarNuevaVersion() {
   const fileInput = document.getElementById('fileInputNuevaVersion');
-  const btnSubir = document.getElementById('btnConfirmarSubidaVersion');
-  const statusArea = document.getElementById('statusSubidaVersion');
+  const btn = document.getElementById('btnConfirmarSubidaVersion');
+  const status = document.getElementById('statusSubidaVersion');
+
   if (!fileInput.files.length) return alert("Selecciona un archivo PDF.");
-  if (!versionesFolderId) return alert("Error técnico: Carpeta de versiones no identificada.");
   
-  const archivo = fileInput.files[0];
-  toggleUIState([btnSubir], statusArea, true);
+  const file = fileInput.files[0];
+  btn.disabled = true;
+  if (status) status.classList.remove("d-none");
+
   const reader = new FileReader();
   reader.onload = function(e) {
     const base64 = e.target.result.split(",")[1];
     google.script.run
       .withSuccessHandler(() => {
-        fileInput.value = "";
-        toggleUIState([btnSubir], statusArea, false);
-        
-        const modalEl = document.getElementById('modalNuevaVersion');
-        if (modalEl) {
-          const instance = bootstrap.Modal.getInstance(modalEl);
-          if (instance) instance.hide();
-        }
-        
+        bootstrap.Modal.getInstance(document.getElementById('modalNuevaVersion')).hide();
         cargarDetalleDocumento();
       })
       .withFailureHandler(err => {
-        toggleUIState([btnSubir], statusArea, false);
+        btn.disabled = false;
+        if (status) status.classList.add("d-none");
         alert(`Error: ${err.message}`);
       })
       .subirNuevaVersionServidor(versionesFolderId, base64);
   };
-  reader.readAsDataURL(archivo);
+  reader.readAsDataURL(file);
 }
 
-/**
- * Alterna estados de carga en botones y spinners.
- */
-function toggleUIState(buttons, statusElement, isLoading) {
-  buttons.forEach(btn => { if(btn) btn.disabled = isLoading; });
-  if (statusElement) {
-    isLoading ? statusElement.classList.remove("d-none") : statusElement.classList.add("d-none");
-  }
-}
-
-/**
- * Muestra feedback visual al usuario tras una asignación.
- */
-function mostrarMensajeRev(texto, clase) {
-  const el = document.getElementById("msgAsignacion");
-  if (!el) return;
-  el.className = "mt-2 small fw-bold " + clase;
-  el.textContent = texto;
-  if (clase.includes("success")) {
-    setTimeout(() => { el.textContent = ""; }, 5000);
-  }
-}
-
-/**
- * Validador básico de formato de email.
- */
-function validarEmail(email) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-}
-
-/**
- * Prepara los datos globales y navega a la vista del visor del autor.
- */
 function abrirObservacionesAutor(fileId, nombre) {
   if (!fileId) return alert("Archivo no disponible.");
   window.ID_REVISION_ACTUAL = fileId;

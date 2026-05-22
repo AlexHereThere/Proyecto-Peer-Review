@@ -1,0 +1,119 @@
+<script>
+/**
+ * js_admin_usuarios.html - Lógica de Gestión de Usuarios y Roles (Admin)
+ */
+
+/**
+ * Abre el modal de gestión de usuarios.
+ */
+function abrirModalUsuarios() {
+  const tbody = document.getElementById("tablaUsuarios");
+  const msg   = document.getElementById("msgUsuarios");
+  if (tbody) {
+    UI_mostrarLoadingTabla("tablaUsuarios", 5, "Cargando usuarios...");
+  }
+  if (msg) msg.textContent = "";
+
+  new bootstrap.Modal(document.getElementById("modalUsuarios")).show();
+
+  google.script.run
+    .withSuccessHandler(renderTablaUsuarios)
+    .withFailureHandler(err => {
+      if (tbody) tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger py-3">Error al cargar: ${err.message}</td></tr>`;
+    })
+    .obtenerTodosUsuarios();
+}
+
+/**
+ * Renderiza los usuarios en el modal.
+ */
+function renderTablaUsuarios(usuarios) {
+  const tbody = document.getElementById("tablaUsuarios");
+  if (!tbody) return;
+
+  if (!usuarios || usuarios.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-3">No hay usuarios registrados.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = usuarios.map(usr => `
+    <tr>
+      <td class="align-middle small fw-semibold">${usr.nombre}</td>
+      <td class="align-middle small text-muted">${usr.email}</td>
+      <td class="align-middle text-center">
+        <input type="checkbox"
+               class="form-check-input"
+               ${usr.roles.includes("Autor") ? "checked" : ""}
+               onchange="toggleRol('${usr.email}', 'Autor', this.checked, this)">
+      </td>
+      <td class="align-middle text-center">
+        <input type="checkbox"
+               class="form-check-input"
+               ${usr.roles.includes("Revisor") ? "checked" : ""}
+               onchange="toggleRol('${usr.email}', 'Revisor', this.checked, this)">
+      </td>
+      <td class="align-middle text-center">
+        <input type="checkbox"
+               class="form-check-input"
+               ${usr.roles.includes("Admin") ? "checked" : ""}
+               onchange="toggleRol('${usr.email}', 'Admin', this.checked, this)">
+      </td>
+    </tr>
+  `).join("");
+}
+
+/**
+ * Actualiza los roles de un usuario.
+ */
+function toggleRol(email, rol, activo, elemento) {
+  const msg = document.getElementById("msgUsuarios");
+
+  const fila = [...document.querySelectorAll("#tablaUsuarios tr")]
+    .find(tr => tr.textContent.includes(email));
+
+  if (!fila) return;
+
+  const checkboxes = fila.querySelectorAll("input[type=checkbox]");
+  const roles = ["Autor", "Revisor", "Admin"].filter((r, i) => checkboxes[i]?.checked);
+
+  if (msg) {
+    msg.className = "mb-2 small fw-bold text-info";
+    msg.textContent = "Guardando...";
+  }
+
+  // Protección para que el Admin no se quite el rol a sí mismo
+  if (rol === "Admin" && !activo && email === (window._emailActual || "")) {
+    if (msg) {
+      msg.className = "mb-2 small fw-bold text-danger";
+      msg.textContent = "No puedes quitarte el rol Admin a ti mismo.";
+      setTimeout(() => { msg.textContent = ""; }, 3000);
+    }
+    if (elemento) elemento.checked = true;
+    return;
+  }
+
+  google.script.run
+    .withSuccessHandler(() => {
+      if (msg) {
+        msg.className = "mb-2 small fw-bold text-success";
+        msg.textContent = `Roles de ${email} actualizados.`;
+        setTimeout(() => { msg.textContent = ""; }, 3000);
+      }
+
+      // Si se cambió los roles de sí mismo, actualizar la UI
+      if (email === (window._emailActual || "")) {
+        if (typeof actualizarPermisosYBotonesUI === "function") {
+          actualizarPermisosYBotonesUI(); 
+        }
+      }
+    })
+    .withFailureHandler(err => {
+      if (msg) {
+        msg.className = "mb-2 small fw-bold text-danger";
+        msg.textContent = "Error: " + err.message;
+      }
+      if (elemento) elemento.checked = !activo;
+    })
+    .actualizarRolesUsuario(email, roles);
+}
+</script>

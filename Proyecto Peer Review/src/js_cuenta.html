@@ -41,20 +41,11 @@ function actualizarInterfaz(data) {
   if (containerRoles && data.perfil.rol) {
     containerRoles.innerHTML = ""; 
 
-    // Mapeo: Rol -> Categoría de Bootstrap (que ya tiene tus colores)
-    const mapaColores = {
-      'Autor': 'bg-primary',   // Usará verde (#00723f)
-      'Revisor': 'bg-secondary', // Usará naranja/oro (#dd971a)
-      'Admin': 'bg-success',   // Usará azul (#20419A)
-      'Editor': 'bg-info'      // Usará púrpura (#630df0)
-    };
-
     const roles = data.perfil.rol.split(',').map(rol => rol.trim());
 
     roles.forEach(rol => {
       if (rol) {
-        // Buscamos el color en el mapa, si no existe usamos secondary por defecto
-        const claseColor = mapaColores[rol] || 'bg-secondary';
+        const claseColor = UI_ROLES[rol] || 'bg-secondary';
 
         const cardHTML = `
           <div class="card ${claseColor} text-white shadow-sm border-0">

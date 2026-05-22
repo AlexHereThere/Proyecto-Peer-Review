@@ -11,44 +11,26 @@ let todosLosDocs = [];
 /** @type {string} Criterio de búsqueda seleccionado por el usuario */
 let buscarPor = "Nombre";
 
-/** @const {Object} Mapeo de estados de documentos a clases CSS de Bootstrap */
-const BADGE_ESTADO_DOC = {
-  "Pendiente": "bg-secondary",
-  "En revisión": "bg-warning text-dark",
-  "En Revisión": "bg-warning text-dark", 
-  "A Corregir": "bg-danger",
-  "Aprobado": "bg-success"
-};
-
 // --- 2. CARGA Y SINCRONIZACIÓN ---
 
-/**
- * Inicializa la vista de documentos configurando los criterios de búsqueda por defecto.
- */
 function cargarDocumentos() {
   const criterioEl = document.getElementById("criterioActual");
   if (criterioEl) criterioEl.textContent = "Nombre";
   cargarTablaDocumentos();
 }
 
-/**
- * Solicita al servidor la lista de documentos vinculados al usuario actual.
- */
 function cargarTablaDocumentos() {
   const tbody = document.getElementById("tablaDocumentos");
   if (!tbody) return;
 
-  mostrarLoadingTabla(tbody, true);
+  UI_mostrarLoadingTabla("tablaDocumentos", 4, "Sincronizando...");
 
   google.script.run
     .withSuccessHandler((data) => {
-      tbody.dataset.cargando = "false";
       todosLosDocs = data || [];
       renderTablaDocumentos(todosLosDocs);
     })
     .withFailureHandler((err) => {
-      tbody.dataset.cargando = "false";
-      // CORREGIDO: Ajustado a un colspan de 4 columnas por la nueva estructura
       tbody.innerHTML = `<tr><td colspan="4" class="text-center text-danger py-3"><i class="bi bi-exclamation-triangle-fill me-1"></i> Error: ${err.message}</td></tr>`;
     })
     .obtenerDocumentos_Usuario();
@@ -56,10 +38,6 @@ function cargarTablaDocumentos() {
 
 // --- 3. FILTRADO Y RENDERIZADO ---
 
-/**
- * Actualiza el criterio de búsqueda (Nombre o Estado).
- * @param {string} valor - El nombre del campo por el cual filtrar.
- */
 function setBuscarPor(valor) {
   buscarPor = valor;
   const criterioEl = document.getElementById("criterioActual");
@@ -67,9 +45,6 @@ function setBuscarPor(valor) {
   filtrarDocumentos();
 }
 
-/**
- * Filtra la lista global de documentos según el texto ingresado en el buscador.
- */
 function filtrarDocumentos() {
   const buscador = document.getElementById("buscador");
   if (!buscador) return;
@@ -82,23 +57,18 @@ function filtrarDocumentos() {
   renderTablaDocumentos(filtrados);
 }
 
-/**
- * Renderiza las filas de la tabla basándose en los datos procesados.
- * @param {Array<Object>} docs - Lista de documentos filtrada o completa.
- */
 function renderTablaDocumentos(docs) {
   const tbody = document.getElementById("tablaDocumentos");
   if (!tbody) return;
 
   if (!docs || docs.length === 0) {
-    // CORREGIDO: Ajustado a un colspan de 4 columnas
-    tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted py-3">No se encontraron documentos registrados.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted py-3">No hay documentos registrados.</td></tr>`;
     return;
   }
 
   tbody.innerHTML = docs.map(doc => {
     const { fecha, nombre, idRaiz, estado } = doc;
-    const badge = BADGE_ESTADO_DOC[estado] || "bg-secondary";
+    const badge = UI_BADGES[estado] || "bg-secondary";
 
     return `
       <tr>
@@ -120,18 +90,11 @@ function renderTablaDocumentos(docs) {
 
 // --- 4. ACCIONES ---
 
-/**
- * Establece el contexto del documento actual y navega a la vista de detalle.
- * @param {string} idDoc - ID raíz del documento seleccionado.
- */
 function abrirDocumento(idDoc) {
   window.ID_DOCUMENTO_ACTUAL = idDoc;
   cargarVista("page_doc_detalle");
 }
 
-/**
- * Captura el archivo seleccionado, lo convierte a Base64 y lo envía al servidor para registro.
- */
 function ejecutarSubida() {
   const fileInput = document.getElementById("fileInput");
   const mensaje = document.getElementById("mensajeSubida");
@@ -165,35 +128,10 @@ function ejecutarSubida() {
 
 // --- 5. HELPERS VISUALES ---
 
-/**
- * Controla la visualización del estado de carga dentro de la tabla.
- */
-function mostrarLoadingTabla(tbody, show) {
-  tbody.dataset.cargando = show ? "true" : "false";
-  if (show) {
-    // CORREGIDO: Ajustado a un colspan de 4 columnas
-    tbody.innerHTML = `
-      <tr>
-        <td colspan="4" class="text-center text-muted py-4">
-          <div class="spinner-border spinner-border-sm text-primary me-2"></div>
-          Sincronizando...
-        </td>
-      </tr>`;
-  }
-}
-
-/**
- * Renderiza un mensaje de alerta en un contenedor específico.
- */
 function mostrarAlerta(contenedor, tipo, texto) {
-  if (contenedor) {
-    contenedor.innerHTML = `<div class="alert alert-${tipo} py-2 mb-0">${texto}</div>`;
-  }
+  if (contenedor) contenedor.innerHTML = `<div class="alert alert-${tipo} py-2 mb-0">${texto}</div>`;
 }
 
-/**
- * Alterna el estado de los botones y mensajes durante el proceso de subida.
- */
 function toggleSubidaUI(btn, mensaje, isProcessing) {
   if (btn) btn.disabled = isProcessing;
   if (isProcessing && mensaje) {
@@ -201,20 +139,12 @@ function toggleSubidaUI(btn, mensaje, isProcessing) {
   }
 }
 
-/**
- * Limpia el formulario y oculta el modal tras una subida exitosa.
- */
 function limpiarYRefrescarSubida(input, btn) {
   setTimeout(() => {
     if (input) input.value = "";
     if (btn) btn.disabled = false;
-    
     const modalEl = document.getElementById("modalSubir");
-    if (modalEl) {
-      const instance = bootstrap.Modal.getInstance(modalEl);
-      if (instance) instance.hide();
-    }
-    
+    if (modalEl) bootstrap.Modal.getInstance(modalEl)?.hide();
     cargarTablaDocumentos(); 
   }, 1500);
 }

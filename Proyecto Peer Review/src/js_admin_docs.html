@@ -1,0 +1,109 @@
+<script>
+/**
+ * js_admin_docs.html - Gestión de Tabla de Documentos y Filtros (Admin)
+ */
+
+let todosLosDocsAdmin = [];
+let criterioAdmin = "Nombre";
+
+/**
+ * Carga la tabla principal de documentos desde el servidor.
+ */
+function cargarAdmin() {
+  const tbody = document.getElementById("tablaAdmin");
+  if (!tbody) return;
+
+  UI_mostrarLoadingTabla("tablaAdmin", 5, "Cargando documentos...");
+  tbody.dataset.cargando = "true";
+
+  const timeout = setTimeout(() => {
+    if (tbody.dataset.cargando === "true") {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="5" class="text-center text-muted py-3">
+            No se encontraron documentos o el servidor tardó demasiado.
+          </td>
+        </tr>`;
+    }
+  }, 12000);
+
+  google.script.run
+    .withSuccessHandler(data => {
+      tbody.dataset.cargando = "false";
+      clearTimeout(timeout);
+      todosLosDocsAdmin = data || [];
+      renderTablaAdmin(todosLosDocsAdmin);
+    })
+    .withFailureHandler(err => {
+      tbody.dataset.cargando = "false";
+      clearTimeout(timeout);
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="5" class="text-center text-danger py-3">
+            Error al cargar: ${err.message}
+          </td>
+        </tr>`;
+    })
+    .obtenerTodosDocumentos();
+}
+
+/**
+ * Actualiza el criterio de filtrado.
+ */
+function setCriterioAdmin(valor) {
+  criterioAdmin = valor;
+  const el = document.getElementById("criterioAdmin");
+  if (el) el.textContent = valor;
+  filtrarAdmin();
+}
+
+/**
+ * Filtra los documentos en memoria basándose en la búsqueda.
+ */
+function filtrarAdmin() {
+  const query = document.getElementById("buscadorAdmin")?.value.toLowerCase() || "";
+  const filtrados = todosLosDocsAdmin.filter(doc => {
+    if (criterioAdmin === "Nombre") return doc.nombre.toLowerCase().includes(query);
+    if (criterioAdmin === "Autor")  return doc.autor.toLowerCase().includes(query);
+    if (criterioAdmin === "Estado") return doc.estado.toLowerCase().includes(query);
+    return true;
+  });
+  renderTablaAdmin(filtrados);
+}
+
+/**
+ * Renderiza las filas de la tabla de documentos.
+ */
+function renderTablaAdmin(docs) {
+  const tbody = document.getElementById("tablaAdmin");
+  if (!tbody) return;
+
+  if (!docs || docs.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-3">No hay documentos registrados.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = docs.map(doc => {
+    const badge = UI_BADGES[doc.estado] || "bg-secondary";
+    return `
+      <tr>
+        <td class="align-middle fw-semibold">
+          <i class="bi bi-file-earmark-pdf me-1 text-danger"></i>
+          ${doc.nombre}
+        </td>
+        <td class="align-middle text-muted small">${doc.autor}</td>
+        <td class="align-middle text-center">
+          <span class="badge ${badge} rounded-pill px-3">${doc.estado}</span>
+        </td>
+        <td class="align-middle text-muted small">${doc.fecha}</td>
+        <td class="align-middle text-center">
+          <button
+            class="btn btn-sm btn-outline-primary"
+            onclick="abrirModalAsignar('${doc.idRaiz}', '${doc.nombre}', '${doc.versionesId}', '${doc.revisionesId}')">
+            <i class="bi bi-person-plus"></i> Asignar Revisor
+          </button>
+        </td>
+      </tr>`;
+  }).join("");
+}
+</script>

@@ -94,17 +94,7 @@ function actualizarBadgeEstado() {
   if (!badge) return;
 
   badge.textContent = estadoRevision;
-  badge.classList.remove("bg-secondary", "bg-warning", "bg-success", "bg-danger");
-
-  if (estadoRevision === "Asignado") {
-    badge.classList.add("bg-secondary");
-  } else if (estadoRevision === "En Revisión" || estadoRevision === "En revisión") {
-    badge.classList.add("bg-warning", "text-dark");
-  } else if (estadoRevision === "Finalizado" || estadoRevision === "Aprobado") {
-    badge.classList.add("bg-success");
-  } else if (estadoRevision === "A Corregir") {
-    badge.classList.add("bg-danger");
-  }
+  badge.className = "badge rounded-pill " + (UI_BADGES[estadoRevision] || "bg-secondary");
 }
 
 /**

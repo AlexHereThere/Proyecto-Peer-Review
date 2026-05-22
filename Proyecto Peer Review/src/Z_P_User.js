@@ -17,18 +17,6 @@ function PU_User(rastreo) {
     trackUsuario(rastreo, email);
   };
 
-  Qunit.module("PU_User: Utilidades de Texto");
-
-  Qunit.test("Limpiar Nombre (Normalización)", (assert) => {
-    const caso1 = "Ramón Núñez López";
-    const caso2 = "Archivo @ Especial! #2026";
-    const caso3 = "";
-
-    assert.equal(limpiarNombre(caso1), "ramon_nunez_lopez", "Elimina acentos y convierte a minúsculas.");
-    assert.equal(limpiarNombre(caso2), "archivo_especial_2026", "Limpia caracteres especiales y gestiona espacios.");
-    assert.equal(limpiarNombre(caso3), "usuario_sin_nombre", "Gestiona correctamente entradas vacías.");
-  });
-
   Qunit.module("PU_User: Identidad de Google");
 
   Qunit.test("Sacar Info de Google (Sesión Actual)", (assert) => {
@@ -77,7 +65,7 @@ function PU_User(rastreo) {
 
   Qunit.test("Integridad de Dashboard Data", (assert) => {
     try {
-      const data = getUserDashboardData();
+      const data = getDashboardData();
       assert.ok(data, "La función retornó el objeto de datos del dashboard.");
 
       if (data) {

@@ -1,5 +1,5 @@
 /**
- * Drive.gs - Gestión de Estructura de Archivos y Carpetas
+ * Drive.js - Gestión de Estructura de Archivos y Carpetas
  */
 
 // --- 1. Gestión de Estructura (Carpetas) ---
@@ -8,8 +8,8 @@
  * Obtiene una carpeta por su nombre dentro de una carpeta padre específica. 
  * Si no existe, procede a crearla.
  * @param {string} nombre - El nombre de la carpeta a buscar o crear.
- * @param {DriveApp.Folder} padre - El objeto carpeta (Folder) donde se realizará la búsqueda.
- * @return {DriveApp.Folder} - El objeto de la carpeta encontrada o creada.
+ * @param {GoogleAppsScript.Drive.Folder} padre - El objeto carpeta (Folder) donde se realizará la búsqueda.
+ * @returns {GoogleAppsScript.Drive.Folder} El objeto de la carpeta encontrada o creada.
  */
 function obtenerOCrearCarpeta(nombre, padre) {
   const iter = padre.getFoldersByName(nombre);
@@ -18,7 +18,7 @@ function obtenerOCrearCarpeta(nombre, padre) {
 
 /**
  * Asegura la existencia de la carpeta raíz de la aplicación en Google Drive.
- * @return {DriveApp.Folder} - El objeto de la carpeta raíz "AppPeerReviewUABC".
+ * @returns {GoogleAppsScript.Drive.Folder} El objeto de la carpeta raíz "AppPeerReviewUABC".
  */
 function obtenerCarpetaRaiz() {
   const RAIZ_NOMBRE = "AppPeerReviewUABC";
@@ -29,7 +29,7 @@ function obtenerCarpetaRaiz() {
 /**
  * Crea o recupera la carpeta base del usuario utilizando su email como identificador.
  * @param {string} email - El correo electrónico del usuario.
- * @return {string} - El ID de la carpeta de usuario creada o recuperada.
+ * @returns {string} El ID de la carpeta de usuario creada o recuperada.
  */
 function inicializarCarpetaUsuario(email) {
   const raiz = obtenerCarpetaRaiz();
@@ -41,7 +41,7 @@ function inicializarCarpetaUsuario(email) {
  * Carpeta principal -> subcarpetas 'versiones' y 'revisiones'.
  * @param {string} nombreTrabajo - Nombre descriptivo para el trabajo.
  * @param {string} folderIdUsuario - ID de la carpeta raíz del usuario.
- * @return {object} - Objeto con los IDs de las carpetas: {trabajoId, versionesId, revisionesId}.
+ * @returns {Object} Objeto con los IDs de las carpetas: {trabajoId, versionesId, revisionesId}.
  */
 function crearCarpetaTrabajo(nombreTrabajo, folderIdUsuario) {
   const carpetaRaizUsuario = DriveApp.getFolderById(folderIdUsuario);
@@ -61,7 +61,7 @@ function crearCarpetaTrabajo(nombreTrabajo, folderIdUsuario) {
  * @param {string} nombre - Nombre que se asignará al nuevo archivo.
  * @param {string} base64 - Contenido del archivo codificado en Base64.
  * @param {string} folderId - ID de la carpeta donde se guardará el archivo.
- * @return {string} - El ID del archivo recién creado.
+ * @returns {string} El ID del archivo recién creado.
  */
 function subirArchivo(nombre, base64, folderId) {
   const folder = DriveApp.getFolderById(folderId);
@@ -74,7 +74,7 @@ function subirArchivo(nombre, base64, folderId) {
  * @param {string} fileId - ID del archivo original a copiar.
  * @param {string} nuevoNombre - El nombre que tendrá la copia resultante.
  * @param {string} folderId - ID de la carpeta de destino.
- * @return {string} - El ID de la copia generada.
+ * @returns {string} El ID de la copia generada.
  */
 function copiarArchivo(fileId, nuevoNombre, folderId) {
   const carpeta = DriveApp.getFolderById(folderId);
@@ -87,7 +87,7 @@ function copiarArchivo(fileId, nuevoNombre, folderId) {
  * Requiere que el servicio Avanzado de Drive esté habilitado.
  * @param {string} fileId - ID del archivo a actualizar.
  * @param {string} base64Data - Nuevos datos en formato Base64.
- * @return {object} - Respuesta de la API de Drive tras la actualización.
+ * @returns {Object} Respuesta de la API de Drive tras la actualización.
  */
 function actualizarContenidoArchivo(fileId, base64Data) {
   const bytes = Utilities.base64Decode(base64Data);
@@ -97,8 +97,10 @@ function actualizarContenidoArchivo(fileId, base64Data) {
 
 /**
  * Obtiene la información de un archivo PDF y la codifica en Base64 para su uso en el cliente.
- * @param {string} fileId - El ID del archivo a recuperar
-*/
+ * @param {string} fileId - El ID del archivo a recuperar.
+ * @returns {Object} Objeto con bytes (base64), fileName y fileId.
+ * @throws {Error} Si el ID de archivo no es proporcionado o no se puede acceder al archivo.
+ */
 function getPDFData(fileId) {
   try {
     if (!fileId) throw new Error("ID de archivo no proporcionado.");
