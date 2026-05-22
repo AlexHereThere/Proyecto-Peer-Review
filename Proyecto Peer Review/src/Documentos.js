@@ -158,7 +158,7 @@ function obtenerDocumentos_Usuario() {
  * Obtiene todos los documentos del sistema para el panel admin. Sin ofuscación de datos.
  * @returns {Array<Object>} Lista completa de documentos registrada en el sistema.
  */
-function obtenerTodosDocuments() {
+function obtenerTodosDocumentos() {
   const data = getSheetData("Documentos");
   if (data.length <= 1) return [];
 

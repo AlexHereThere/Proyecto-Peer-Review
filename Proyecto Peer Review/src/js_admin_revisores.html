@@ -271,8 +271,6 @@ function guardarCopiarRevisores() {
   const checkEl = document.getElementById("checkCopiarRevisores");
   if (!checkEl || !docSeleccionadoAdmin) return;
 
-  google.script.run.setCopiarRevisores(docSeleccionadoAdmin.idRaiz, checkEl.checked);
-
   if (checkEl.checked) {
     const msg = document.getElementById("msgAsignarAdmin");
     if (msg) {

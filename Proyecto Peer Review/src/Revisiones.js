@@ -82,6 +82,9 @@ function iniciarRevision(idArchivoR) {
     `abrirDocumento('${idArchivoV1}')`
   );
   
+  SpreadsheetApp.flush(); //escibe fila
+  limpiarCacheDatos(); //borrar caché
+
   ejecutarActualizacionDeEstadoMaestro(idArchivoV1);
   return true;
 }
@@ -119,6 +122,9 @@ function finalizarRevision(idArchivoR, dictamenRevisor) {
     `abrirDocumento('${idArchivoV1}')`
   );
   
+  SpreadsheetApp.flush(); //escibe fila
+  limpiarCacheDatos(); //borrar caché
+
   ejecutarActualizacionDeEstadoMaestro(idArchivoV1);
   return true;
 }
