@@ -31,7 +31,7 @@ export default defineConfig({
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('')`. */
-    baseURL: 'https://script.google.com/macros/s/AKfycbzI6Wkv4hWCSuHto28BgK0pWuLRpkEmnJsT7pPaaY9G0neklG-qnpfm2HFbqYNdP3jN/exec',
+    baseURL: 'https://script.google.com/macros/s/AKfycby8CB-gSLuJOJg3z9MaB8ogP_0uWhwrLqdXY7Nqxiu-KNpxDZ50qICezA34Mxhkki1i/exec',
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
