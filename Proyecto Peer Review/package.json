@@ -4,7 +4,7 @@
   "description": "",
   "main": "Actividad.js",
   "scripts": {
-    "test:grabar": "npx playwright codegen --load-storage=playwright/.auth/user.json https://script.google.com/macros/s/AKfycbzx28m2JWcpYwCaHAwkDFqAdZdG8ybEefOoQ6eBmSaD4IW6Ojo7EDNuYb9h61tN-oIW3g/exec"
+    "test:grabar": "npx playwright codegen --load-storage=playwright/.auth/user.json https://script.google.com/macros/s/AKfycbzI6Wkv4hWCSuHto28BgK0pWuLRpkEmnJsT7pPaaY9G0neklG-qnpfm2HFbqYNdP3jN/exec"
   },
   "keywords": [],
   "author": "",

@@ -32,17 +32,15 @@
   </div>
 
   <div class="col-md-4">
-    <div class="card h-100">
-      <div class="card-body">
-        <h5>Mis Documento</h5>
-        <p>Acceso rapido para revisar estado de trabajos o ingresar nuevos.</p>
-        <button 
-          class="btn btn-primary" 
-          onclick="cargarVista('page_documentos')">
-          Ir
-        </button>
-      </div>
+  <div class="card h-100">
+    <div class="card-body">
+      <h5 id="cardTitleDinamico">Cargando...</h5>
+      <p id="cardDescDinamica">Verificando permisos...</p>
+      <button class="btn btn-primary" id="cardBtnDinamico" onclick="void(0)">
+        Ir
+      </button>
     </div>
   </div>
+</div>
 </div>
 

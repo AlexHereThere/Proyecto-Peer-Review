@@ -1,18 +1,78 @@
 <script>
 /**
- * js_home.html - Lógica de Bienvenida
+ * js_home.html - Lógica de Bienvenida con Prioridad (Revisor > Autor)
  */
 
 function cargarHome() {
   const homeName = document.getElementById("usernameHome");
 
+  // 1. Obtenemos primero la información de Google tal y como la tienes
   google.script.run
     .withSuccessHandler((user) => {
       if (homeName) homeName.innerText = user.name;
+      
+      // 2. Con el email en mano, evaluamos los roles respetando la prioridad
+      evaluarPrioridadDeRoles(user.email);
     })
     .withFailureHandler(err => console.error("Error al obtener info de Google:", err))
-    .sacarGoogleInfoUsuario();
+    .sacarGoogleInfoUsuario(); // Tu función original intacta
 }
 
+/**
+ * Evalúa los roles de forma secuencial para aplicar la prioridad: Revisor > Autor
+ */
+function evaluarPrioridadDeRoles(email) {
+  // PRIMERA PRIORIDAD: Verificar si es Revisor
+  google.script.run
+    .withSuccessHandler((esRevisor) => {
+      if (esRevisor) {
+        // Si es revisor, adaptamos la carta de inmediato y terminamos
+        adaptarCartaSegunRol('revisor');
+      } else {
+        // SEGUNDA PRIORIDAD: Si no fue revisor, verificamos si es Autor
+        verificarSiEsAutor(email);
+      }
+    })
+    .withFailureHandler(err => console.error("Error al verificar rol Revisor:", err))
+    .tieneRol(email, 'Revisor'); // Llamada directa a tu función del backend
+}
+
+function verificarSiEsAutor(email) {
+  google.script.run
+    .withSuccessHandler((esAutor) => {
+      if (esAutor) {
+        adaptarCartaSegunRol('autor');
+      } else {
+        // Si no cumple ningún rol
+        adaptarCartaSegunRol('visitante');
+      }
+    })
+    .withFailureHandler(err => console.error("Error al verificar rol Autor:", err))
+    .tieneRol(email, 'Autor'); // Llamada directa a tu función del backend
+}
+
+function adaptarCartaSegunRol(rol) {
+  const titulo = document.getElementById('cardTitleDinamico');
+  const descripcion = document.getElementById('cardDescDinamica');
+  const boton = document.getElementById('cardBtnDinamico');
+
+  if (!titulo || !descripcion || !boton) return;
+
+  if (rol === 'revisor') {
+    titulo.textContent = 'Mis Revisiones';
+    descripcion.textContent = 'Acceso rápido para evaluar los trabajos asignados.';
+    boton.setAttribute('onclick', "cargarVista('page_revisiones')");
+  } else if (rol === 'autor') {
+    titulo.textContent = 'Mis Documentos';
+    descripcion.textContent = 'Acceso rápido para revisar estado de trabajos o ingresar nuevos.';
+    boton.setAttribute('onclick', "cargarVista('page_documentos')");
+  } else {
+    titulo.textContent = 'Administración';
+    descripcion.textContent = 'Acceso rápido para la gestion de usuarios y asignación de revisiones.';
+    boton.setAttribute('onclick', "cargarVista('page_admin')");
+  }
+}
+
+// Inicializar el flujo al cargar la vista
 cargarHome();
 </script>
