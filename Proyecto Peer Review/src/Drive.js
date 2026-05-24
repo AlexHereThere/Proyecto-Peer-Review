@@ -37,9 +37,8 @@ function inicializarCarpetaUsuario(email) {
 
  try {
    // Configura la carpeta para que cualquier miembro de la UABC con el enlace pueda editarla
-   //carpetaUsuario.setSharing(DriveApp.Access.DOMAIN_WITH_LINK, DriveApp.Permission.EDIT);
-   carpetaUsuario.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.EDIT);
-   //carpetaUsuario.addEditor("karoeclipse@gmail.com");
+   carpetaUsuario.setSharing(DriveApp.Access.DOMAIN_WITH_LINK, DriveApp.Permission.EDIT);
+   //carpetaUsuario.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.EDIT);
   } catch(e) {
    console.error("Error al cambiar compartir por dominio: " + e.toString());
   }
